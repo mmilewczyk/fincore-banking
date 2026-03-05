@@ -11,7 +11,7 @@ import org.springframework.stereotype.Repository;
 import com.matcodem.fincore.account.infrastructure.persistence.entity.AccountJpaEntity;
 
 @Repository
-public interface SpringDataAccountRepository extends JpaRepository<AccountJpaEntity, UUID> {
+public interface AccountJpaRepository extends JpaRepository<AccountJpaEntity, UUID> {
 
 	Optional<AccountJpaEntity> findByIban(String iban);
 

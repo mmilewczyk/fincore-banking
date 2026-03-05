@@ -1,0 +1,276 @@
+version: '3.9'
+
+services:
+  postgres-account:
+    image: postgres:16-alpine
+    container_name: fincore-postgres-account
+    environment:
+      POSTGRES_DB: account_db
+      POSTGRES_USER: fincore
+      POSTGRES_PASSWORD: fincore_secret
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-account-data:/var/lib/postgresql/data
+      - ./init/account-init.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U fincore -d account_db" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - fincore-network
+
+  postgres-payment:
+    image: postgres:16-alpine
+    container_name: fincore-postgres-payment
+    environment:
+      POSTGRES_DB: payment_db
+      POSTGRES_USER: fincore
+      POSTGRES_PASSWORD: fincore_secret
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres-payment-data:/var/lib/postgresql/data
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U fincore -d payment_db" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - fincore-network
+
+  postgres-fraud:
+    image: postgres:16-alpine
+    container_name: fincore-postgres-fraud
+    environment:
+      POSTGRES_DB: fraud_db
+      POSTGRES_USER: fincore
+      POSTGRES_PASSWORD: fincore_secret
+    ports:
+      - "5434:5432"
+    volumes:
+      - postgres-fraud-data:/var/lib/postgresql/data
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U fincore -d fraud_db" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - fincore-network
+
+  postgres-fx:
+    image: postgres:16-alpine
+    container_name: fincore-postgres-fx
+    environment:
+      POSTGRES_DB: fx_db
+      POSTGRES_USER: fincore
+      POSTGRES_PASSWORD: fincore_secret
+    ports:
+      - "5435:5432"
+    volumes:
+      - postgres-fx-data:/var/lib/postgresql/data
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U fincore -d fx_db" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - fincore-network
+
+  postgres-notification:
+    image: postgres:16-alpine
+    container_name: fincore-postgres-notification
+    environment:
+      POSTGRES_DB: notification_db
+      POSTGRES_USER: fincore
+      POSTGRES_PASSWORD: fincore_secret
+    ports:
+      - "5436:5432"
+    volumes:
+      - postgres-notification-data:/var/lib/postgresql/data
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U fincore -d notification_db" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - fincore-network
+
+  redis:
+    image: redis:7-alpine
+    container_name: fincore-redis
+    command: redis-server --requirepass fincore_redis_secret --appendonly yes
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: [ "CMD", "redis-cli", "-a", "fincore_redis_secret", "ping" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - fincore-network
+
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.6.0
+    container_name: fincore-zookeeper
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    ports:
+      - "2181:2181"
+    volumes:
+      - zookeeper-data:/var/lib/zookeeper/data
+      - zookeeper-logs:/var/lib/zookeeper/log
+    networks:
+      - fincore-network
+
+  kafka:
+    image: confluentinc/cp-kafka:7.6.0
+    container_name: fincore-kafka
+    depends_on:
+      zookeeper:
+        condition: service_started
+    ports:
+      - "9092:9092"
+      - "29092:29092"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:9092
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: 'true'
+      KAFKA_LOG_RETENTION_HOURS: 168
+    volumes:
+      - kafka-data:/var/lib/kafka/data
+    healthcheck:
+      test: [ "CMD", "kafka-topics", "--bootstrap-server", "localhost:9092", "--list" ]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    networks:
+      - fincore-network
+
+  kafka-ui:
+    image: provectuslabs/kafka-ui:latest
+    container_name: fincore-kafka-ui
+    depends_on:
+      - kafka
+    ports:
+      - "8090:8080"
+    environment:
+      KAFKA_CLUSTERS_0_NAME: fincore
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:29092
+    networks:
+      - fincore-network
+
+  schema-registry:
+    image: confluentinc/cp-schema-registry:7.6.0
+    container_name: fincore-schema-registry
+    depends_on:
+      - kafka
+    ports:
+      - "8081:8081"
+    environment:
+      SCHEMA_REGISTRY_HOST_NAME: schema-registry
+      SCHEMA_REGISTRY_KAFKASTORE_BOOTSTRAP_SERVERS: kafka:29092
+      SCHEMA_REGISTRY_LISTENERS: http://0.0.0.0:8081
+    networks:
+      - fincore-network
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:24.0
+    container_name: fincore-keycloak
+    command: start-dev --import-realm
+    environment:
+      KEYCLOAK_ADMIN: admin
+      KEYCLOAK_ADMIN_PASSWORD: admin
+      KC_DB: postgres
+      KC_DB_URL: jdbc:postgresql://postgres-account:5432/account_db
+      KC_DB_USERNAME: fincore
+      KC_DB_PASSWORD: fincore_secret
+    ports:
+      - "8180:8080"
+    volumes:
+      - ./keycloak/realm-export.json:/opt/keycloak/data/import/realm-export.json
+    depends_on:
+      postgres-account:
+        condition: service_healthy
+    networks:
+      - fincore-network
+
+  prometheus:
+    image: prom/prometheus:v2.51.0
+    container_name: fincore-prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./observability/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus-data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.enable-lifecycle'
+    networks:
+      - fincore-network
+
+  grafana:
+    image: grafana/grafana:10.4.0
+    container_name: fincore-grafana
+    ports:
+      - "3000:3000"
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_USERS_ALLOW_SIGN_UP: 'false'
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./observability/grafana/provisioning:/etc/grafana/provisioning
+    depends_on:
+      - prometheus
+    networks:
+      - fincore-network
+
+  tempo:
+    image: grafana/tempo:2.4.0
+    container_name: fincore-tempo
+    command: [ "-config.file=/etc/tempo.yaml" ]
+    ports:
+      - "3200:3200"
+      - "4317:4317"   # OTLP gRPC
+      - "4318:4318"   # OTLP HTTP
+    volumes:
+      - ./observability/tempo.yaml:/etc/tempo.yaml
+      - tempo-data:/tmp/tempo
+    networks:
+      - fincore-network
+
+  mailpit:
+    image: axllent/mailpit:latest
+    container_name: fincore-mailpit
+    ports:
+      - "1025:1025"   # SMTP
+      - "8025:8025"   # Web UI
+    networks:
+      - fincore-network
+
+volumes:
+  postgres-account-data:
+  postgres-payment-data:
+  postgres-fraud-data:
+  postgres-fx-data:
+  postgres-notification-data:
+  redis-data:
+  kafka-data:
+  zookeeper-data:
+  zookeeper-logs:
+  prometheus-data:
+  grafana-data:
+  tempo-data:
+
+networks:
+  fincore-network:
+    driver: bridge

@@ -1,0 +1,95 @@
+{
+  "realm": "fincore",
+  "enabled": true,
+  "sslRequired": "external",
+  "registrationAllowed": false,
+  "loginWithEmailAllowed": true,
+  "duplicateEmailsAllowed": false,
+  "resetPasswordAllowed": true,
+  "editUsernameAllowed": false,
+  "bruteForceProtected": true,
+  "accessTokenLifespan": 300,
+  "refreshTokenMaxReuse": 0,
+  "clients": [
+    {
+      "clientId": "fincore-gateway",
+      "enabled": true,
+      "clientAuthenticatorType": "client-secret",
+      "secret": "fincore-gateway-secret",
+      "redirectUris": [
+        "*"
+      ],
+      "webOrigins": [
+        "*"
+      ],
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": true,
+      "serviceAccountsEnabled": true,
+      "authorizationServicesEnabled": false,
+      "protocol": "openid-connect"
+    },
+    {
+      "clientId": "fincore-internal",
+      "enabled": true,
+      "clientAuthenticatorType": "client-secret",
+      "secret": "fincore-internal-secret",
+      "standardFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": true,
+      "protocol": "openid-connect"
+    }
+  ],
+  "roles": {
+    "realm": [
+      {
+        "name": "ROLE_USER",
+        "description": "Standard bank customer"
+      },
+      {
+        "name": "ROLE_ADMIN",
+        "description": "Bank administrator"
+      },
+      {
+        "name": "ROLE_TELLER",
+        "description": "Bank teller"
+      }
+    ]
+  },
+  "users": [
+    {
+      "username": "testuser",
+      "enabled": true,
+      "email": "testuser@fincore.com",
+      "firstName": "Test",
+      "lastName": "User",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "password123",
+          "temporary": false
+        }
+      ],
+      "realmRoles": [
+        "ROLE_USER"
+      ]
+    },
+    {
+      "username": "admin",
+      "enabled": true,
+      "email": "admin@fincore.com",
+      "firstName": "Admin",
+      "lastName": "User",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "admin123",
+          "temporary": false
+        }
+      ],
+      "realmRoles": [
+        "ROLE_ADMIN",
+        "ROLE_USER"
+      ]
+    }
+  ]
+}
