@@ -1,0 +1,89 @@
+spring:
+  application:
+    name: fraud-detection-service
+
+  datasource:
+    url: jdbc:postgresql://localhost:5434/fraud_db
+    username: fincore
+    password: fincore_secret
+    hikari:
+      maximum-pool-size: 10
+      minimum-idle: 2
+
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+    show-sql: false
+
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+
+  kafka:
+    bootstrap-servers: localhost:9092
+
+  data:
+    redis:
+      host: localhost
+      port: 6379
+      password: fincore_redis_secret
+
+  cache:
+    type: redis
+    redis:
+      time-to-live: 300000  # 5 minutes — behavioral context cache
+
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: http://localhost:8180/realms/fincore
+          jwk-set-uri: http://localhost:8180/realms/fincore/protocol/openid-connect/certs
+
+server:
+  port: 8083
+  shutdown: graceful
+
+# Fraud rule configuration — tunable without code changes
+fraud:
+  rules:
+    large-amount:
+      absolute-limit: 50000
+      historical-multiplier: 10
+      average-multiplier: 3
+    velocity:
+      max-per-hour-critical: 10
+      max-per-hour-warn: 5
+      max-per-day: 20
+    new-account:
+      high-amount-threshold: 5000
+    night-time:
+      start-hour: 0
+      end-hour: 5
+      amount-threshold: 10000
+      timezone: Europe/Warsaw
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus,metrics
+  metrics:
+    export:
+      prometheus:
+        enabled: true
+  tracing:
+    sampling:
+      probability: 1.0
+  otlp:
+    tracing:
+      endpoint: http://localhost:4318/v1/traces
+
+logging:
+  level:
+    com.fincore: DEBUG
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] [%X{traceId}/%X{spanId}] %-5level %logger{36} - %msg%n"

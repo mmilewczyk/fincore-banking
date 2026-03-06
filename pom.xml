@@ -18,6 +18,7 @@
 	<modules>
 		<module>account-service</module>
 		<module>payment-service</module>
+		<module>fraud-detection-service</module>
 	</modules>
 
 	<properties>
