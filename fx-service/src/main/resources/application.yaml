@@ -1,0 +1,106 @@
+spring:
+  application:
+    name: fx-service
+
+  datasource:
+    url: jdbc:postgresql://localhost:5435/fx_db
+    username: fincore
+    password: fincore_secret
+    hikari:
+      maximum-pool-size: 10
+      minimum-idle: 2
+
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+
+  kafka:
+    bootstrap-servers: localhost:9092
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
+      acks: all
+      properties:
+        enable.idempotence: true
+
+  data:
+    redis:
+      host: localhost
+      port: 6379
+      password: fincore_redis_secret
+
+  cache:
+    type: redis
+    redis:
+      time-to-live: 60000  # 60 seconds — tight TTL for financial data
+
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: http://localhost:8180/realms/fincore
+          jwk-set-uri: http://localhost:8180/realms/fincore/protocol/openid-connect/certs
+
+server:
+  port: 8084
+  shutdown: graceful
+
+fx:
+  spread:
+    default-bps: 50       # 50 basis points = 0.5% spread
+  rate:
+    validity-minutes: 60  # rates valid for 1 hour before going stale
+    refresh-interval-ms: 300000  # refresh every 5 minutes
+  providers:
+    exchange-rates-api:
+      base-url: https://api.exchangeratesapi.io/v1
+      api-key: ${FX_API_KEY:demo}
+      base-currency: EUR
+
+resilience4j:
+  circuitbreaker:
+    instances:
+      exchange-rates-api:
+        slidingWindowSize: 10
+        failureRateThreshold: 50
+        waitDurationInOpenState: 30s
+        permittedNumberOfCallsInHalfOpenState: 3
+      ecb-provider:
+        slidingWindowSize: 5
+        failureRateThreshold: 60
+        waitDurationInOpenState: 60s
+  retry:
+    instances:
+      exchange-rates-api:
+        maxAttempts: 3
+        waitDuration: 1s
+        enableExponentialBackoff: true
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus,metrics,circuitbreakers
+  metrics:
+    export:
+      prometheus:
+        enabled: true
+  tracing:
+    sampling:
+      probability: 1.0
+  otlp:
+    tracing:
+      endpoint: http://localhost:4318/v1/traces
+
+logging:
+  level:
+    com.fincore: DEBUG
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] [%X{traceId}/%X{spanId}] %-5level %logger{36} - %msg%n"
