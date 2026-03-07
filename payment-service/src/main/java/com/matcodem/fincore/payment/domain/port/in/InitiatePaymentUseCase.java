@@ -1,4 +1,4 @@
-package com.matcodem.fincore.payment.domain.domain.port.in;
+package com.matcodem.fincore.payment.domain.port.in;
 
 
 import com.matcodem.fincore.payment.domain.model.IdempotencyKey;

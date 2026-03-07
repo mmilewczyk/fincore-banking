@@ -5,30 +5,45 @@ import java.util.List;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
 
-import com.matcodem.fincore.payment.domain.domain.port.out.OutboxRepository;
 import com.matcodem.fincore.payment.domain.model.OutboxMessage;
+import com.matcodem.fincore.payment.domain.port.out.OutboxRepository;
 
 import io.micrometer.core.instrument.MeterRegistry;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
 /**
- * Outbox Poller — the second half of the Outbox Pattern.
+ * Outbox Processor — the missing piece that makes at-least-once delivery real.
  * <p>
- * Flow:
- * 1. PaymentApplicationService saves payment + OutboxMessage in one DB transaction
- * 2. This poller (runs every 1s) reads PENDING messages from outbox table
- * 3. Publishes each message to Kafka
- * 4. On success: marks message as SENT
- * 5. On failure: increments retryCount; after 5 failures → DEAD_LETTER
+ * Pattern:
+ * 1. Business operation saves Payment + OutboxMessage in ONE DB transaction
+ * 2. This scheduler polls PENDING outbox messages and publishes them to Kafka
+ * 3. On ACK from Kafka → mark SENT
+ * 4. On failure → increment retry count; after 5 attempts → DEAD_LETTER
  * <p>
- * Uses SELECT FOR UPDATE SKIP LOCKED — safe to run on multiple instances:
- * → Each pod picks a different set of messages, no duplicates.
+ * Concurrency safety:
+ * SELECT FOR UPDATE SKIP LOCKED ensures that if multiple instances of
+ * payment-service are running (K8s replicas), each message is processed
+ * by exactly one instance. The lock is held for the duration of the
+ * publish + update, then released.
  * <p>
- * Why not use @TransactionalEventListener?
- * → It fires after TX commit, but if the app crashes between commit and Kafka send,
- * the event is lost. Outbox + polling survives crashes.
+ * Topic routing:
+ * eventType "payment.initiated"   → fincore.payments.payment-initiated
+ * eventType "payment.completed"   → fincore.payments.payment-completed
+ * eventType "payment.failed"      → fincore.payments.payment-failed
+ * eventType "payment.fraud.*"     → fincore.payments.payment-fraud-rejected
+ * eventType "payment.cancelled"   → fincore.payments.payment-cancelled
+ * <p>
+ * Kafka key = aggregateId (paymentId) → ordering guaranteed per payment
+ * within a partition.
+ * <p>
+ * Monitoring:
+ * outbox.published.total   — successful publishes
+ * outbox.failed.total      — publish failures (retriable)
+ * outbox.dead_letter.total — messages that exhausted retries
+ * outbox.pending.gauge     — current backlog (alert if > threshold)
  */
 @Slf4j
 @Component
@@ -40,9 +55,17 @@ public class OutboxPoller {
 	private final MeterRegistry meterRegistry;
 
 	private static final String TOPIC_PREFIX = "fincore.payments.";
-	private static final int BATCH_SIZE = 50;
+	private static final int BATCH_SIZE = 100;
 
-	@Scheduled(fixedDelay = 1000) // poll every 1 second
+	/**
+	 * Poll every 500ms. Fixed delay (not rate) — next run starts after
+	 * current run + 500ms, preventing overlap under load.
+	 * <p>
+	 * Under normal load: 100 messages/500ms = 200 msg/s throughput.
+	 * If backlog grows, increase BATCH_SIZE or decrease fixedDelay.
+	 */
+	@Scheduled(fixedDelay = 500)
+	@Transactional
 	public void pollAndPublish() {
 		List<OutboxMessage> messages = outboxRepository.findPendingMessages(BATCH_SIZE);
 
@@ -51,30 +74,60 @@ public class OutboxPoller {
 		log.debug("Processing {} outbox messages", messages.size());
 
 		for (OutboxMessage message : messages) {
-			publishMessage(message);
+			processMessage(message);
 		}
 	}
 
-	private void publishMessage(OutboxMessage message) {
-		String topic = TOPIC_PREFIX + message.getEventType().replace(".", "-");
+	private void processMessage(OutboxMessage message) {
+		String topic = resolveTopic(message.getEventType());
 
 		try {
+			// sendSync() blocks until broker ACKs — guarantees the message
+			// is durable before we mark it SENT in the same transaction.
 			kafkaTemplate.send(topic, message.getAggregateId(), message.getPayload())
-					.whenComplete((result, ex) -> {
-						if (ex != null) {
-							log.error("Failed to publish outbox message {}: {}", message.getId(), ex.getMessage());
-							outboxRepository.markFailed(message);
-							meterRegistry.counter("outbox.publish.failed").increment();
-						} else {
-							outboxRepository.markSent(message);
-							meterRegistry.counter("outbox.publish.success").increment();
-							log.debug("Outbox message {} sent to topic {}", message.getId(), topic);
-						}
-					});
+					.get(); // blocks for broker ack
+
+			message.markSent();
+			outboxRepository.markSent(message);
+
+			meterRegistry.counter("outbox.published.total",
+					"eventType", message.getEventType()).increment();
+
+			log.debug("Outbox published: {} → {} (aggregateId: {})",
+					message.getEventType(), topic, message.getAggregateId());
+
 		} catch (Exception ex) {
-			log.error("Error publishing outbox message {}: {}", message.getId(), ex.getMessage(), ex);
+			log.error("Outbox publish failed for message {} (retry {}): {}",
+					message.getId(), message.getRetryCount(), ex.getMessage());
+
+			message.markFailed();
 			outboxRepository.markFailed(message);
-			meterRegistry.counter("outbox.publish.error").increment();
+
+			if (message.isDeadLetter()) {
+				log.error("DEAD LETTER — message {} exhausted retries. eventType={}, aggregateId={}",
+						message.getId(), message.getEventType(), message.getAggregateId());
+				meterRegistry.counter("outbox.dead_letter.total",
+						"eventType", message.getEventType()).increment();
+			} else {
+				meterRegistry.counter("outbox.failed.total",
+						"eventType", message.getEventType()).increment();
+			}
 		}
+	}
+
+	/**
+	 * Maps domain event type to Kafka topic name.
+	 * <p>
+	 * Convention: eventType uses dots (payment.completed),
+	 * topic uses hyphens (payment-completed) under fincore.payments. prefix.
+	 */
+	private String resolveTopic(String eventType) {
+		// payment.initiated       → fincore.payments.payment-initiated
+		// payment.completed       → fincore.payments.payment-completed
+		// payment.failed          → fincore.payments.payment-failed
+		// payment.fraud.rejected  → fincore.payments.payment-fraud-rejected
+		// payment.cancelled       → fincore.payments.payment-cancelled
+		String suffix = eventType.replace(".", "-");
+		return TOPIC_PREFIX + suffix;
 	}
 }

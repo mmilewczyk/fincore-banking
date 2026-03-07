@@ -2,10 +2,11 @@ package com.matcodem.fincore.payment.adapter.out.persistence;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 
 import org.springframework.stereotype.Component;
 
-import com.matcodem.fincore.payment.domain.domain.port.out.PaymentRepository;
+import com.matcodem.fincore.payment.domain.port.out.PaymentRepository;
 import com.matcodem.fincore.payment.domain.model.Currency;
 import com.matcodem.fincore.payment.domain.model.IdempotencyKey;
 import com.matcodem.fincore.payment.domain.model.Money;
@@ -34,6 +35,11 @@ public class PaymentRepositoryAdapter implements PaymentRepository {
 	@Override
 	public Optional<Payment> findById(PaymentId paymentId) {
 		return paymentJpaRepository.findById(paymentId.value()).map(this::toDomain);
+	}
+
+	@Override
+	public Optional<Payment> findByIdString(String paymentId) {
+		return paymentJpaRepository.findById(UUID.fromString(paymentId)).map(this::toDomain);
 	}
 
 	@Override

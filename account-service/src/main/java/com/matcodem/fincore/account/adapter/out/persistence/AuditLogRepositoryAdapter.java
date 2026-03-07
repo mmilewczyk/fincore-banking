@@ -29,7 +29,7 @@ import lombok.Setter;
 @RequiredArgsConstructor
 public class AuditLogRepositoryAdapter implements AuditLogRepository {
 
-	private final SpringDataAuditLogRepository springDataRepository;
+	private final AuditLogJpaRepository auditLogJpaRepository;
 
 	@Override
 	public void log(AuditLogRepository.AuditEntry entry) {
@@ -40,12 +40,12 @@ public class AuditLogRepositoryAdapter implements AuditLogRepository {
 		entity.setPerformedBy(entry.performedBy());
 		entity.setDetails(entry.details());
 		entity.setOccurredAt(entry.occurredAt());
-		springDataRepository.save(entity);
+		auditLogJpaRepository.save(entity);
 	}
 
 	@Override
 	public List<AuditEntry> findByAccountId(AccountId accountId) {
-		return springDataRepository.findByAccountIdOrderByOccurredAtDesc(accountId.value())
+		return auditLogJpaRepository.findByAccountIdOrderByOccurredAtDesc(accountId.value())
 				.stream()
 				.map(this::toEntry)
 				.toList();
@@ -53,7 +53,7 @@ public class AuditLogRepositoryAdapter implements AuditLogRepository {
 
 	@Override
 	public List<AuditEntry> findByAccountIdAndDateRange(AccountId accountId, Instant from, Instant to) {
-		return springDataRepository.findByAccountIdAndOccurredAtBetweenOrderByOccurredAtDesc(
+		return auditLogJpaRepository.findByAccountIdAndOccurredAtBetweenOrderByOccurredAtDesc(
 				accountId.value(), from, to
 		).stream().map(this::toEntry).toList();
 	}
@@ -99,7 +99,7 @@ public class AuditLogRepositoryAdapter implements AuditLogRepository {
 	}
 
 	@Repository
-	interface SpringDataAuditLogRepository extends JpaRepository<AuditLogJpaEntity, UUID> {
+	interface AuditLogJpaRepository extends JpaRepository<AuditLogJpaEntity, UUID> {
 
 		List<AuditLogJpaEntity> findByAccountIdOrderByOccurredAtDesc(UUID accountId);
 

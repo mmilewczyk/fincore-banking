@@ -10,6 +10,7 @@ import com.matcodem.fincore.account.domain.model.AccountId;
 import com.matcodem.fincore.account.domain.model.IBAN;
 import com.matcodem.fincore.account.domain.port.out.AccountRepository;
 import com.matcodem.fincore.account.infrastructure.persistence.AccountPersistenceMapper;
+import com.matcodem.fincore.account.infrastructure.persistence.repository.AccountJpaRepository;
 
 import lombok.RequiredArgsConstructor;
 
@@ -17,7 +18,7 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public class AccountRepositoryAdapter implements AccountRepository {
 
-	private final com.matcodem.fincore.account.infrastructure.persistence.repository.AccountJpaRepository accountJpaRepository;
+	private final AccountJpaRepository accountJpaRepository;
 	private final AccountPersistenceMapper mapper;
 
 	@Override

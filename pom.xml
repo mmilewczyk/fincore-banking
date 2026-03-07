@@ -20,6 +20,7 @@
 		<module>payment-service</module>
 		<module>fraud-detection-service</module>
 		<module>fx-service</module>
+		<module>api-gateway</module>
 	</modules>
 
 	<properties>

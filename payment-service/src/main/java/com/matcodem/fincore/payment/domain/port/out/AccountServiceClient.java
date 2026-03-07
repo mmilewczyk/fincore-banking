@@ -1,6 +1,8 @@
-package com.matcodem.fincore.payment.domain.domain.port.out;
+package com.matcodem.fincore.payment.domain.port.out;
 
 import com.matcodem.fincore.payment.domain.model.Money;
+
+import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
 
 /**
  * Driven port — communication with Account Service.

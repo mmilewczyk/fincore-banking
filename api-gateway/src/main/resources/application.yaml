@@ -1,0 +1,115 @@
+spring:
+  application:
+    name: api-gateway
+
+  cloud:
+    gateway:
+      # ─── Global default filters ──────────────────────────────────
+      default-filters:
+        - DedupeResponseHeader=Access-Control-Allow-Credentials Access-Control-Allow-Origin
+        - name: RequestRateLimiter
+          args:
+            redis-rate-limiter.replenishRate: 100     # tokens per second
+            redis-rate-limiter.burstCapacity: 200     # max burst
+            redis-rate-limiter.requestedTokens: 1
+            key-resolver: "#{@userKeyResolver}"
+
+      # ─── Routes ──────────────────────────────────────────────────
+      routes:
+
+        # Account Service
+        - id: account-service
+          uri: http://account-service.fincore.svc.cluster.local:8081
+          predicates:
+            - Path=/api/v1/accounts/**
+          filters:
+            - name: CircuitBreaker
+              args:
+                name: account-service
+                fallbackUri: forward:/fallback/account-service
+            - name: Retry
+              args:
+                retries: 3
+                statuses: BAD_GATEWAY, SERVICE_UNAVAILABLE
+                backoff:
+                  firstBackoff: 100ms
+                  maxBackoff: 500ms
+
+        # Payment Service
+        - id: payment-service
+          uri: http://payment-service.fincore.svc.cluster.local:8082
+          predicates:
+            - Path=/api/v1/payments/**
+          filters:
+            - name: CircuitBreaker
+              args:
+                name: payment-service
+                fallbackUri: forward:/fallback/payment-service
+            - name: RequestRateLimiter
+              args:
+                redis-rate-limiter.replenishRate: 20   # stricter for payments
+                redis-rate-limiter.burstCapacity: 40
+                key-resolver: "#{@userKeyResolver}"
+
+        # FX Service
+        - id: fx-service
+          uri: http://fx-service.fincore.svc.cluster.local:8084
+          predicates:
+            - Path=/api/v1/fx/**
+          filters:
+            - name: CircuitBreaker
+              args:
+                name: fx-service
+                fallbackUri: forward:/fallback/fx-service
+
+        # Fraud Service — compliance only
+        - id: fraud-service
+          uri: http://fraud-detection-service.fincore.svc.cluster.local:8083
+          predicates:
+            - Path=/api/v1/fraud/**
+          filters:
+            - name: CircuitBreaker
+              args:
+                name: fraud-service
+                fallbackUri: forward:/fallback/fraud-service
+
+  # Redis for rate limiting
+  data:
+    redis:
+      host: redis.fincore.svc.cluster.local
+      port: 6379
+      password: ${REDIS_PASSWORD:fincore_redis_secret}
+
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: http://keycloak.fincore.svc.cluster.local:8080/realms/fincore
+          jwk-set-uri: http://keycloak.fincore.svc.cluster.local:8080/realms/fincore/protocol/openid-connect/certs
+
+server:
+  port: 8080
+  shutdown: graceful
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus,metrics,gateway
+  metrics:
+    export:
+      prometheus:
+        enabled: true
+  tracing:
+    sampling:
+      probability: 1.0
+  otlp:
+    tracing:
+      endpoint: http://otel-collector.fincore.svc.cluster.local:4318/v1/traces
+
+logging:
+  level:
+    org.springframework.cloud.gateway: INFO
+    com.fincore.gateway: DEBUG
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] [%X{traceId}/%X{spanId}] %-5level %logger{36} - %msg%n"

@@ -1,8 +1,8 @@
 package com.matcodem.fincore.payment.infrastructure.messaging;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.matcodem.fincore.payment.domain.domain.port.out.OutboxEventPublisher;
-import com.matcodem.fincore.payment.domain.domain.port.out.OutboxRepository;
+import com.matcodem.fincore.payment.domain.port.out.OutboxEventPublisher;
+import com.matcodem.fincore.payment.domain.port.out.OutboxRepository;
 import com.matcodem.fincore.payment.domain.event.DomainEvent;
 import com.matcodem.fincore.payment.domain.model.OutboxMessage;
 

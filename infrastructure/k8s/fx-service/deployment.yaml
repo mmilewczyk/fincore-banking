@@ -1,0 +1,64 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: fx-service
+  namespace: fincore
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: fx-service
+  template:
+    metadata:
+      labels:
+        app: fx-service
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8084"
+        prometheus.io/path: "/actuator/prometheus"
+    spec:
+      containers:
+        - name: fx-service
+          image: fincore/fx-service:latest
+          ports:
+            - containerPort: 8084
+          env:
+            - name: SPRING_DATASOURCE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: fx-db-secret
+                  key: url
+            - name: SPRING_DATASOURCE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: fx-db-secret
+                  key: password
+            - name: SPRING_KAFKA_BOOTSTRAP_SERVERS
+              value: "kafka.fincore.svc.cluster.local:9092"
+            - name: FX_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: fx-provider-secret
+                  key: api-key
+          resources:
+            requests: { memory: "256Mi", cpu: "250m" }
+            limits: { memory: "512Mi", cpu: "500m" }
+          livenessProbe:
+            httpGet: { path: /actuator/health/liveness, port: 8084 }
+            initialDelaySeconds: 60
+          readinessProbe:
+            httpGet: { path: /actuator/health/readiness, port: 8084 }
+            initialDelaySeconds: 30
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: fx-service
+  namespace: fincore
+spec:
+  type: ClusterIP
+  selector:
+    app: fx-service
+  ports:
+    - port: 8084
+      targetPort: 8084

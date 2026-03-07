@@ -1,0 +1,91 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: payment-service
+  namespace: fincore
+  labels:
+    app: payment-service
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: payment-service
+  template:
+    metadata:
+      labels:
+        app: payment-service
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8082"
+        prometheus.io/path: "/actuator/prometheus"
+    spec:
+      containers:
+        - name: payment-service
+          image: fincore/payment-service:latest
+          ports:
+            - containerPort: 8082
+          env:
+            - name: SPRING_DATASOURCE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: payment-db-secret
+                  key: url
+            - name: SPRING_DATASOURCE_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: payment-db-secret
+                  key: username
+            - name: SPRING_DATASOURCE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: payment-db-secret
+                  key: password
+            - name: SPRING_KAFKA_BOOTSTRAP_SERVERS
+              value: "kafka.fincore.svc.cluster.local:9092"
+            - name: SERVICES_ACCOUNT_BASE_URL
+              value: "http://account-service.fincore.svc.cluster.local:8081"
+            - name: SERVICES_FX_BASE_URL
+              value: "http://fx-service.fincore.svc.cluster.local:8084"
+          resources:
+            requests:
+              memory: "512Mi"
+              cpu: "500m"
+            limits:
+              memory: "1Gi"
+              cpu: "1000m"
+          livenessProbe:
+            httpGet:
+              path: /actuator/health/liveness
+              port: 8082
+            initialDelaySeconds: 60
+            periodSeconds: 15
+          readinessProbe:
+            httpGet:
+              path: /actuator/health/readiness
+              port: 8082
+            initialDelaySeconds: 30
+            periodSeconds: 10
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: payment-service
+  namespace: fincore
+spec:
+  type: ClusterIP           # Internal only — never exposed directly
+  selector:
+    app: payment-service
+  ports:
+    - port: 8082
+      targetPort: 8082
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: payment-service-pdb
+  namespace: fincore
+spec:
+  minAvailable: 2           # Always keep at least 2 pods during rolling updates
+  selector:
+    matchLabels:
+      app: payment-service

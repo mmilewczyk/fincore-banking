@@ -20,12 +20,12 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import com.matcodem.fincore.payment.application.usecase.PaymentApplicationService;
-import com.matcodem.fincore.payment.domain.domain.port.in.InitiatePaymentUseCase;
-import com.matcodem.fincore.payment.domain.domain.port.out.AccountServiceClient;
-import com.matcodem.fincore.payment.domain.domain.port.out.OutboxEventPublisher;
-import com.matcodem.fincore.payment.domain.domain.port.out.OutboxRepository;
-import com.matcodem.fincore.payment.domain.domain.port.out.PaymentLockService;
-import com.matcodem.fincore.payment.domain.domain.port.out.PaymentRepository;
+import com.matcodem.fincore.payment.domain.port.in.InitiatePaymentUseCase;
+import com.matcodem.fincore.payment.domain.port.out.AccountServiceClient;
+import com.matcodem.fincore.payment.domain.port.out.OutboxEventPublisher;
+import com.matcodem.fincore.payment.domain.port.out.OutboxRepository;
+import com.matcodem.fincore.payment.domain.port.out.PaymentLockService;
+import com.matcodem.fincore.payment.domain.port.out.PaymentRepository;
 import com.matcodem.fincore.payment.domain.model.Currency;
 import com.matcodem.fincore.payment.domain.model.IdempotencyKey;
 import com.matcodem.fincore.payment.domain.model.Money;

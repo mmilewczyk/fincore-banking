@@ -1,4 +1,4 @@
-package com.matcodem.fincore.payment.domain.domain.port.out;
+package com.matcodem.fincore.payment.domain.port.out;
 
 /**
  * Implementation uses Redisson with watchdog (auto-renewal).

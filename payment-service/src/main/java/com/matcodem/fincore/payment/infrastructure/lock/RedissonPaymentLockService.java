@@ -8,7 +8,7 @@ import org.redisson.api.RLock;
 import org.redisson.api.RedissonClient;
 import org.springframework.stereotype.Component;
 
-import com.matcodem.fincore.payment.domain.domain.port.out.PaymentLockService;
+import com.matcodem.fincore.payment.domain.port.out.PaymentLockService;
 
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;

@@ -1,0 +1,59 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: fincore
+  labels:
+    name: fincore
+---
+# NetworkPolicy: services can only receive traffic from:
+#   1. The API Gateway (for user-facing requests)
+#   2. Other fincore services (for inter-service calls)
+#   3. Kafka (for event consumption)
+# External traffic to individual services is BLOCKED.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-fincore-internal
+  namespace: fincore
+spec:
+  podSelector: { }            # applies to all pods in namespace
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              name: fincore  # allow traffic within namespace
+        - podSelector: { }
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              name: fincore
+    # Allow DNS
+    - ports:
+        - port: 53
+          protocol: UDP
+        - port: 53
+          protocol: TCP
+    # Allow Keycloak (auth)
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              name: keycloak
+---
+# Only the API Gateway is reachable from outside the cluster
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-gateway-ingress
+  namespace: fincore
+spec:
+  podSelector:
+    matchLabels:
+      tier: gateway
+  policyTypes:
+    - Ingress
+  ingress:
+    - { }   # allow from anywhere (public LoadBalancer)

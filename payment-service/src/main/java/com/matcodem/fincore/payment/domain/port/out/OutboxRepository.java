@@ -1,4 +1,4 @@
-package com.matcodem.fincore.payment.domain.domain.port.out;
+package com.matcodem.fincore.payment.domain.port.out;
 
 import java.util.List;
 

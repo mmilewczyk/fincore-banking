@@ -15,9 +15,9 @@ import java.util.List;
 
 import com.matcodem.fincore.payment.adapter.in.web.dto.InitiatePaymentRequest;
 import com.matcodem.fincore.payment.adapter.in.web.dto.PaymentResponse;
-import com.matcodem.fincore.payment.domain.domain.port.in.GetPaymentUseCase;
-import com.matcodem.fincore.payment.domain.domain.port.in.InitiatePaymentUseCase;
-import com.matcodem.fincore.payment.domain.domain.port.in.ProcessPaymentUseCase;
+import com.matcodem.fincore.payment.domain.port.in.GetPaymentUseCase;
+import com.matcodem.fincore.payment.domain.port.in.InitiatePaymentUseCase;
+import com.matcodem.fincore.payment.domain.port.in.ProcessPaymentUseCase;
 import com.matcodem.fincore.payment.domain.model.Currency;
 import com.matcodem.fincore.payment.domain.model.IdempotencyKey;
 import com.matcodem.fincore.payment.domain.model.Money;

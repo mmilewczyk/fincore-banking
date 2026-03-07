@@ -6,7 +6,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
-import com.matcodem.fincore.payment.domain.domain.port.out.OutboxRepository;
+import com.matcodem.fincore.payment.domain.port.out.OutboxRepository;
 import com.matcodem.fincore.payment.domain.model.OutboxMessage;
 import com.matcodem.fincore.payment.infrastructure.persistence.entity.OutboxMessageJpaEntity;
 import com.matcodem.fincore.payment.infrastructure.persistence.repository.OutboxJpaRepository;
