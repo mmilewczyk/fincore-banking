@@ -48,47 +48,6 @@ public class RedissonPaymentLockService implements PaymentLockService {
 	private static final long WAIT_TIMEOUT_SECONDS = 10L;
 
 	@Override
-	public void acquireLock(String sourceAccountId, String targetAccountId) {
-		List<RLock> locks = getOrderedLocks(sourceAccountId, targetAccountId);
-		RLock multiLock = redissonClient.getMultiLock(locks.toArray(new RLock[0]));
-
-		try {
-			boolean acquired = multiLock.tryLock(WAIT_TIMEOUT_SECONDS, TimeUnit.SECONDS);
-			// Note: no leaseTime → watchdog activated
-			if (!acquired) {
-				meterRegistry.counter("payment.lock.timeout").increment();
-				throw new LockAcquisitionException(
-						"Could not acquire lock for accounts [%s, %s] within %ds"
-								.formatted(sourceAccountId, targetAccountId, WAIT_TIMEOUT_SECONDS)
-				);
-			}
-			meterRegistry.counter("payment.lock.acquired").increment();
-			log.debug("Acquired lock for accounts: [{}, {}]", sourceAccountId, targetAccountId);
-		} catch (InterruptedException e) {
-			Thread.currentThread().interrupt();
-			throw new LockAcquisitionException("Interrupted while waiting for lock", e);
-		}
-	}
-
-	@Override
-	public void releaseLock(String sourceAccountId, String targetAccountId) {
-		List<RLock> locks = getOrderedLocks(sourceAccountId, targetAccountId);
-		RLock multiLock = redissonClient.getMultiLock(locks.toArray(new RLock[0]));
-
-		try {
-			if (multiLock.isHeldByCurrentThread()) {
-				multiLock.unlock();
-				meterRegistry.counter("payment.lock.released").increment();
-				log.debug("Released lock for accounts: [{}, {}]", sourceAccountId, targetAccountId);
-			}
-		} catch (Exception e) {
-			// Lock may have expired — log but don't throw (already in finally block)
-			log.warn("Error releasing lock for accounts [{}, {}]: {}",
-					sourceAccountId, targetAccountId, e.getMessage());
-		}
-	}
-
-	@Override
 	public void executeWithLock(String sourceAccountId, String targetAccountId, Runnable action) {
 		Timer.Sample sample = Timer.start(meterRegistry);
 

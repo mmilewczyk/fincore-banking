@@ -24,72 +24,39 @@ import lombok.RequiredArgsConstructor;
 public class PaymentRepositoryAdapter implements PaymentRepository {
 
 	private final PaymentJpaRepository paymentJpaRepository;
+	private final PaymentMapper paymentMapper;
 
 	@Override
 	public Payment save(Payment payment) {
-		var entity = toEntity(payment);
+		var entity = paymentMapper.toEntity(payment);
 		var saved = paymentJpaRepository.save(entity);
-		return toDomain(saved);
+		return paymentMapper.toDomain(saved);
 	}
 
 	@Override
 	public Optional<Payment> findById(PaymentId paymentId) {
-		return paymentJpaRepository.findById(paymentId.value()).map(this::toDomain);
+		return paymentJpaRepository.findById(paymentId.value()).map(paymentMapper::toDomain);
 	}
 
 	@Override
 	public Optional<Payment> findByIdString(String paymentId) {
-		return paymentJpaRepository.findById(UUID.fromString(paymentId)).map(this::toDomain);
+		return paymentJpaRepository.findById(UUID.fromString(paymentId)).map(paymentMapper::toDomain);
 	}
 
 	@Override
 	public Optional<Payment> findByIdempotencyKey(IdempotencyKey key) {
-		return paymentJpaRepository.findByIdempotencyKey(key.value()).map(this::toDomain);
+		return paymentJpaRepository.findByIdempotencyKey(key.value()).map(paymentMapper::toDomain);
 	}
 
 	@Override
 	public List<Payment> findBySourceAccountId(String accountId) {
 		return paymentJpaRepository.findBySourceAccountId(accountId).stream()
-				.map(this::toDomain).toList();
+				.map(paymentMapper::toDomain).toList();
 	}
 
 	@Override
 	public List<Payment> findByTargetAccountId(String accountId) {
 		return paymentJpaRepository.findByTargetAccountId(accountId).stream()
-				.map(this::toDomain).toList();
-	}
-
-	private PaymentJpaEntity toEntity(Payment p) {
-		var e = new PaymentJpaEntity();
-		e.setId(p.getId().value());
-		e.setIdempotencyKey(p.getIdempotencyKey().value());
-		e.setSourceAccountId(p.getSourceAccountId());
-		e.setTargetAccountId(p.getTargetAccountId());
-		e.setAmount(p.getAmount().getAmount());
-		e.setCurrency(p.getAmount().getCurrency().getCode());
-		e.setType(p.getType().name());
-		e.setStatus(p.getStatus().name());
-		e.setFailureReason(p.getFailureReason());
-		e.setInitiatedBy(p.getInitiatedBy());
-		e.setCreatedAt(p.getCreatedAt());
-		e.setUpdatedAt(p.getUpdatedAt());
-		return e;
-	}
-
-	private Payment toDomain(PaymentJpaEntity e) {
-		return Payment.reconstitute(
-				PaymentId.of(e.getId()),
-				IdempotencyKey.of(e.getIdempotencyKey()),
-				e.getSourceAccountId(),
-				e.getTargetAccountId(),
-				Money.of(e.getAmount(), Currency.fromCode(e.getCurrency())),
-				PaymentType.valueOf(e.getType()),
-				e.getInitiatedBy(),
-				PaymentStatus.valueOf(e.getStatus()),
-				e.getFailureReason(),
-				e.getCreatedAt(),
-				e.getUpdatedAt(),
-				e.getVersion()
-		);
+				.map(paymentMapper::toDomain).toList();
 	}
 }

@@ -34,6 +34,7 @@ public class PaymentController {
 	private final InitiatePaymentUseCase initiatePaymentUseCase;
 	private final GetPaymentUseCase getPaymentUseCase;
 	private final ProcessPaymentUseCase processPaymentUseCase;
+	private final PaymentWebMapper paymentWebMapper;
 
 	/**
 	 * Initiates a new payment.
@@ -65,7 +66,7 @@ public class PaymentController {
 		);
 
 		Payment payment = initiatePaymentUseCase.initiatePayment(command);
-		PaymentResponse response = toResponse(payment);
+		PaymentResponse response = paymentWebMapper.toResponse(payment);
 
 		// 200 = idempotent (already existed), 201 = newly created
 		boolean isNew = payment.getCreatedAt().equals(payment.getUpdatedAt());
@@ -90,7 +91,7 @@ public class PaymentController {
 			return ResponseEntity.status(403).build();
 		}
 
-		return ResponseEntity.ok(toResponse(payment));
+		return ResponseEntity.ok(paymentWebMapper.toResponse(payment));
 	}
 
 	@GetMapping("/account/{accountId}")
@@ -99,7 +100,7 @@ public class PaymentController {
 			@PathVariable String accountId) {
 
 		List<PaymentResponse> payments = getPaymentUseCase.getPaymentsByAccount(accountId)
-				.stream().map(this::toResponse).toList();
+				.stream().map(paymentWebMapper::toResponse).toList();
 		return ResponseEntity.ok(payments);
 	}
 
@@ -112,23 +113,6 @@ public class PaymentController {
 	public ResponseEntity<Void> processPayment(@PathVariable String paymentId) {
 		processPaymentUseCase.processPayment(PaymentId.of(paymentId));
 		return ResponseEntity.accepted().build();
-	}
-
-	private PaymentResponse toResponse(Payment p) {
-		return new PaymentResponse(
-				p.getId().toString(),
-				p.getIdempotencyKey().value(),
-				p.getSourceAccountId(),
-				p.getTargetAccountId(),
-				p.getAmount().getAmount(),
-				p.getAmount().getCurrency().getCode(),
-				p.getType().name(),
-				p.getStatus().name(),
-				p.getFailureReason(),
-				p.getInitiatedBy(),
-				p.getCreatedAt(),
-				p.getUpdatedAt()
-		);
 	}
 
 	private boolean isAdmin(Jwt jwt) {

@@ -9,43 +9,41 @@ import org.springframework.stereotype.Component;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.matcodem.fincore.payment.domain.port.in.ProcessPaymentUseCase;
+import com.matcodem.fincore.payment.infrastructure.idempotency.IdempotencyGuard;
 
 import io.micrometer.core.instrument.MeterRegistry;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
 /**
- * Listens to FX conversion events and continues payment processing.
+ * Handles FX conversion failure events from FX Service.
  * <p>
- * FLOW for FX_CONVERSION payments:
+ * NORMAL FLOW:
+ * FX conversion is called SYNCHRONOUSLY within processPayment() — we need
+ * the converted amount immediately before debiting/crediting accounts.
+ * FxServiceWebClient.convert() blocks until the FX Service responds.
  * <p>
- * 1. Payment Service initiates payment (PENDING)
- * 2. Publishes payment.initiated → Fraud Service analyses
- * 3. fraud.case.approved → Payment Service triggers FX conversion via REST
- * (synchronous — we need the converted amount before we can debit/credit)
- * <p>
- * NOTE: FX conversion is called synchronously within processPayment(),
- * not via Kafka. These consumers handle edge cases:
- * <p>
- * fx.conversion.executed — confirmation that async conversion went through
- * (rare: used only for FX batch processing, not normal payment flow)
- * <p>
- * fx.conversion.failed — FX Service failed to convert (rate unavailable, provider down)
- * → Payment Service marks payment FAILED
- * → Publishes payment.failed so customer is notified
+ * THIS CONSUMER handles the async edge case:
+ * fincore.fx.conversion-failed — FX Service published a failure event
+ * (provider timeout, rate unavailable) for a conversion that was initiated
+ * outside the normal synchronous flow (e.g. retry jobs, batch processing).
+ * → Payment Service marks the payment FAILED.
  */
 @Slf4j
 @Component
 @RequiredArgsConstructor
 public class FxConversionResultKafkaConsumer {
 
+	static final String GROUP_ID = "payment-service-fx-consumer";
+
 	private final ProcessPaymentUseCase processPaymentUseCase;
+	private final IdempotencyGuard idempotencyGuard;
 	private final ObjectMapper objectMapper;
 	private final MeterRegistry meterRegistry;
 
 	@KafkaListener(
 			topics = "fincore.fx.conversion-failed",
-			groupId = "payment-service-fx-consumer",
+			groupId = GROUP_ID,
 			containerFactory = "paymentKafkaListenerContainerFactory"
 	)
 	public void onFxConversionFailed(ConsumerRecord<String, String> record, Acknowledgment ack) {
@@ -53,6 +51,13 @@ public class FxConversionResultKafkaConsumer {
 
 		try {
 			Map<String, Object> event = deserialize(record.value());
+			String eventId = extractEventId(event, record);
+
+			if (!idempotencyGuard.tryProcess(eventId, "fx.conversion.failed", GROUP_ID)) {
+				ack.acknowledge();
+				return;
+			}
+
 			String reason = (String) event.getOrDefault("reason", "FX conversion failed");
 			String pair = (String) event.getOrDefault("pair", "unknown");
 
@@ -62,8 +67,7 @@ public class FxConversionResultKafkaConsumer {
 			processPaymentUseCase.failPayment(paymentId,
 					"FX conversion failed (%s): %s".formatted(pair, reason));
 
-			meterRegistry.counter("payment.fx.conversion.failed",
-					"pair", pair).increment();
+			meterRegistry.counter("payment.fx.conversion.failed", "pair", pair).increment();
 			ack.acknowledge();
 
 		} catch (Exception ex) {
@@ -71,6 +75,12 @@ public class FxConversionResultKafkaConsumer {
 					paymentId, ex.getMessage(), ex);
 			throw new RuntimeException("FX failure handler failed: " + paymentId, ex);
 		}
+	}
+
+	private String extractEventId(Map<String, Object> event, ConsumerRecord<?, ?> record) {
+		Object id = event.get("eventId");
+		if (id != null && !id.toString().isBlank()) return id.toString();
+		return "%s-%d-%d".formatted(record.topic(), record.partition(), record.offset());
 	}
 
 	@SuppressWarnings("unchecked")

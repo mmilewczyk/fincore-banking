@@ -96,9 +96,8 @@ public class AccountServiceWebClient implements AccountServiceClient {
 
 		return new AccountServiceClient.AccountInfo(
 				(String) response.get("id"),
-				(String) response.get("status"),
 				(String) response.get("currency"),
-				(String) response.get("ownerId")
+				(Boolean) response.get("status")
 		);
 	}
 
