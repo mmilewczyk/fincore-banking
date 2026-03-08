@@ -1,0 +1,59 @@
+{
+  "type": "record",
+  "name": "PaymentFraudRejectedEvent",
+  "namespace": "com.matcodem.fincore.payment.avro",
+  "doc": "Published when Fraud Detection blocks a payment. Consumed by Notification Service and Compliance Service.",
+  "fields": [
+    {
+      "name": "eventId",
+      "type": "string"
+    },
+    {
+      "name": "occurredAt",
+      "type": {
+        "type": "long",
+        "logicalType": "timestamp-millis"
+      }
+    },
+    {
+      "name": "paymentId",
+      "type": "string"
+    },
+    {
+      "name": "sourceAccountId",
+      "type": "string"
+    },
+    {
+      "name": "amount",
+      "type": {
+        "type": "bytes",
+        "logicalType": "decimal",
+        "precision": 19,
+        "scale": 4
+      }
+    },
+    {
+      "name": "currency",
+      "type": "Currency"
+    },
+    {
+      "name": "fraudReason",
+      "type": "string",
+      "doc": "Rule name + score that triggered rejection, e.g. 'VelocityRule: score=85 (threshold=70)'"
+    },
+    {
+      "name": "fraudScore",
+      "type": [
+        "null",
+        "int"
+      ],
+      "default": null,
+      "doc": "Composite fraud score 0-100. Added in v2 — null in messages from older payment-service versions (BACKWARD compatible)."
+    },
+    {
+      "name": "schemaVersion",
+      "type": "int",
+      "default": 1
+    }
+  ]
+}

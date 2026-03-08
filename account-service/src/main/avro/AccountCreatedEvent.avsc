@@ -1,0 +1,42 @@
+{
+  "type": "record",
+  "name": "AccountCreatedEvent",
+  "namespace": "com.matcodem.fincore.account.avro",
+  "doc": "Published when a new account is opened. Consumed by Notification Service.",
+  "fields": [
+    {
+      "name": "eventId",
+      "type": "string"
+    },
+    {
+      "name": "occurredAt",
+      "type": {
+        "type": "long",
+        "logicalType": "timestamp-millis"
+      }
+    },
+    {
+      "name": "accountId",
+      "type": "string"
+    },
+    {
+      "name": "ownerId",
+      "type": "string",
+      "doc": "userId from Keycloak"
+    },
+    {
+      "name": "iban",
+      "type": "string",
+      "doc": "Full IBAN including country code, e.g. PL61109010140000071219812874"
+    },
+    {
+      "name": "currency",
+      "type": "AccountCurrency"
+    },
+    {
+      "name": "schemaVersion",
+      "type": "int",
+      "default": 1
+    }
+  ]
+}

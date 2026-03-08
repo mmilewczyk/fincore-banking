@@ -1,0 +1,66 @@
+{
+  "type": "record",
+  "name": "ExchangeRatePublishedEvent",
+  "namespace": "com.matcodem.fincore.fx.avro",
+  "doc": "Published when a new FX rate is fetched and stored. Consumed by analytics and rate-caching services.",
+  "fields": [
+    {
+      "name": "eventId",
+      "type": "string"
+    },
+    {
+      "name": "occurredAt",
+      "type": {
+        "type": "long",
+        "logicalType": "timestamp-millis"
+      }
+    },
+    {
+      "name": "rateId",
+      "type": "string"
+    },
+    {
+      "name": "currencyPair",
+      "type": "string",
+      "doc": "e.g. EUR/PLN — base/quote"
+    },
+    {
+      "name": "midRate",
+      "type": {
+        "type": "bytes",
+        "logicalType": "decimal",
+        "precision": 19,
+        "scale": 8
+      },
+      "doc": "Mid-market rate — scale=8 for precision required in FX (e.g. 4.28150000)"
+    },
+    {
+      "name": "bidRate",
+      "type": {
+        "type": "bytes",
+        "logicalType": "decimal",
+        "precision": 19,
+        "scale": 8
+      }
+    },
+    {
+      "name": "askRate",
+      "type": {
+        "type": "bytes",
+        "logicalType": "decimal",
+        "precision": 19,
+        "scale": 8
+      }
+    },
+    {
+      "name": "spreadBasisPoints",
+      "type": "int",
+      "doc": "Spread in basis points (1 bp = 0.01%). ask−bid expressed as bps of mid."
+    },
+    {
+      "name": "schemaVersion",
+      "type": "int",
+      "default": 1
+    }
+  ]
+}

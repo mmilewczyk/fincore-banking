@@ -10,22 +10,17 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.client.WebClient;
 
 import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
+import io.github.resilience4j.retry.annotation.Retry;
 import lombok.extern.slf4j.Slf4j;
 
 /**
- * Adapter to FX Service.
+ * Adapter to FX Service — synchronous HTTP client with circuit breaker.
  * <p>
- * K8s DNS: http://fx-service.fincore.svc.cluster.local:8084
- * <p>
- * Payment flow involving FX:
- * 1. Payment Service receives FX_CONVERSION payment request
- * 2. Calls FxServiceClient.convert() synchronously
- * → FX Service locks rate, records conversion, returns converted amount
+ * FX_CONVERSION payment flow:
+ * 1. Payment approved by fraud service → processPayment() called
+ * 2. convert() called synchronously — FX Service locks a rate and persists
+ * a FxConversion record, returns the converted amount
  * 3. Payment Service uses converted amount for account debit/credit
- * <p>
- * Quote flow (no side effects):
- * - Called by payment before committing, to show customer the rate
- * - Returns rate + fee estimate, nothing is persisted
  */
 @Slf4j
 @Component
@@ -34,20 +29,22 @@ public class FxServiceWebClient {
 	private final WebClient webClient;
 
 	public FxServiceWebClient(
-			WebClient.Builder builder,
+			WebClient.Builder webClientBuilder,
 			@Value("${services.fx.base-url:http://fx-service.fincore.svc.cluster.local:8084}")
 			String baseUrl) {
-		this.webClient = builder.baseUrl(baseUrl).build();
+		this.webClient = webClientBuilder.baseUrl(baseUrl).build();
 	}
 
 	/**
-	 * Execute FX conversion — rate is locked, conversion persisted in FX Service.
-	 * Returns the converted amount to use for account operations.
+	 * Execute FX conversion — idempotent via paymentId.
+	 * FX Service deduplicates on paymentId: calling twice with the same ID
+	 * returns the same FxConversion record without creating a duplicate.
 	 */
 	@CircuitBreaker(name = "fx-service", fallbackMethod = "convertFallback")
+	@Retry(name = "fx-service")
 	public FxConversionResult convert(String paymentId, String accountId, String requestedBy,
 	                                  String pair, BigDecimal sourceAmount, String direction) {
-		log.info("FX conversion requested — payment: {}, pair: {}, amount: {} direction: {}",
+		log.info("FX convert — payment: {}, pair: {}, amount: {}, direction: {}",
 				paymentId, pair, sourceAmount, direction);
 
 		@SuppressWarnings("unchecked")
@@ -65,21 +62,21 @@ public class FxServiceWebClient {
 				.bodyToMono(Map.class)
 				.block();
 
-		if (response == null) throw new FxServiceUnavailableException("Empty FX response for payment: " + paymentId);
+		if (response == null) {
+			throw new FxServiceUnavailableException("Empty FX response for payment: " + paymentId);
+		}
 
-		BigDecimal convertedAmount = new BigDecimal(response.get("convertedAmount").toString());
-		BigDecimal appliedRate = new BigDecimal(response.get("appliedRate").toString());
-		BigDecimal fee = new BigDecimal(response.get("fee").toString());
-		String conversionId = response.get("id").toString();
-
-		log.info("FX conversion complete — payment: {}, {} → {} (rate: {}, fee: {})",
-				paymentId, sourceAmount, convertedAmount, appliedRate, fee);
-
-		return new FxConversionResult(conversionId, convertedAmount, appliedRate, fee);
+		return new FxConversionResult(
+				response.get("id").toString(),
+				new BigDecimal(response.get("convertedAmount").toString()),
+				new BigDecimal(response.get("appliedRate").toString()),
+				new BigDecimal(response.get("fee").toString())
+		);
 	}
 
 	/**
-	 * Get a rate quote without executing anything — for payment preview.
+	 * Get a rate quote without side effects — for pre-flight amount preview.
+	 * Returns empty on circuit open — caller should degrade gracefully.
 	 */
 	@CircuitBreaker(name = "fx-service", fallbackMethod = "quoteFallback")
 	public Optional<FxQuote> quote(String pair, BigDecimal amount, String direction) {
@@ -104,18 +101,16 @@ public class FxServiceWebClient {
 	private FxConversionResult convertFallback(String paymentId, String accountId,
 	                                           String requestedBy, String pair,
 	                                           BigDecimal sourceAmount, String direction,
-	                                           Exception ex) {
-		log.error("FX Service unavailable — conversion failed for payment {}: {}", paymentId, ex.getMessage());
+	                                           Throwable ex) {
+		log.error("FX Service CB open — convert failed for payment {}: {}", paymentId, ex.getMessage());
 		throw new FxServiceUnavailableException("FX Service unavailable for payment: " + paymentId);
 	}
 
 	private Optional<FxQuote> quoteFallback(String pair, BigDecimal amount,
-	                                        String direction, Exception ex) {
-		log.warn("FX Service unavailable for quote — pair: {}: {}", pair, ex.getMessage());
+	                                        String direction, Throwable ex) {
+		log.warn("FX Service CB open — quote unavailable for pair {}: {}", pair, ex.getMessage());
 		return Optional.empty();
 	}
-
-	// ─── Records ──────────────────────────────────────────────────
 
 	public record FxConversionResult(
 			String conversionId,

@@ -1,0 +1,65 @@
+{
+  "type": "record",
+  "name": "FxConversionFailedEvent",
+  "namespace": "com.matcodem.fincore.fx.avro",
+  "doc": "Published when FX conversion fails. Consumed by payment-service to mark payment FAILED.",
+  "fields": [
+    {
+      "name": "eventId",
+      "type": "string"
+    },
+    {
+      "name": "occurredAt",
+      "type": {
+        "type": "long",
+        "logicalType": "timestamp-millis"
+      }
+    },
+    {
+      "name": "conversionId",
+      "type": "string"
+    },
+    {
+      "name": "paymentId",
+      "type": "string"
+    },
+    {
+      "name": "currencyPair",
+      "type": "string"
+    },
+    {
+      "name": "sourceAmount",
+      "type": {
+        "type": "bytes",
+        "logicalType": "decimal",
+        "precision": 19,
+        "scale": 4
+      }
+    },
+    {
+      "name": "reason",
+      "type": "string"
+    },
+    {
+      "name": "failureCategory",
+      "type": {
+        "type": "enum",
+        "name": "FxFailureCategory",
+        "namespace": "com.matcodem.fincore.fx.avro",
+        "symbols": [
+          "RATE_UNAVAILABLE",
+          "CIRCUIT_BREAKER_OPEN",
+          "PROVIDER_ERROR",
+          "AMOUNT_TOO_LARGE",
+          "UNKNOWN"
+        ]
+      },
+      "default": "UNKNOWN"
+    },
+    {
+      "name": "schemaVersion",
+      "type": "int",
+      "default": 1
+    }
+  ]
+}

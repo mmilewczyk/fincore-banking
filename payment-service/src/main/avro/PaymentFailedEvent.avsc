@@ -1,0 +1,67 @@
+{
+  "type": "record",
+  "name": "PaymentFailedEvent",
+  "namespace": "com.matcodem.fincore.payment.avro",
+  "doc": "Published when payment processing fails (Account Service down, FX unavailable, insufficient funds). Consumed by Notification Service.",
+  "fields": [
+    {
+      "name": "eventId",
+      "type": "string"
+    },
+    {
+      "name": "occurredAt",
+      "type": {
+        "type": "long",
+        "logicalType": "timestamp-millis"
+      }
+    },
+    {
+      "name": "paymentId",
+      "type": "string"
+    },
+    {
+      "name": "sourceAccountId",
+      "type": "string"
+    },
+    {
+      "name": "amount",
+      "type": {
+        "type": "bytes",
+        "logicalType": "decimal",
+        "precision": 19,
+        "scale": 4
+      }
+    },
+    {
+      "name": "currency",
+      "type": "Currency"
+    },
+    {
+      "name": "failureReason",
+      "type": "string",
+      "doc": "Human-readable reason — NOT exposed to end users, for internal ops/alerting only"
+    },
+    {
+      "name": "failureCategory",
+      "type": {
+        "type": "enum",
+        "name": "FailureCategory",
+        "namespace": "com.matcodem.fincore.payment.avro",
+        "symbols": [
+          "ACCOUNT_SERVICE_UNAVAILABLE",
+          "FX_SERVICE_UNAVAILABLE",
+          "INSUFFICIENT_FUNDS",
+          "ACCOUNT_FROZEN",
+          "UNKNOWN"
+        ]
+      },
+      "default": "UNKNOWN",
+      "doc": "Machine-readable category — allows consumers to react differently (e.g. retry vs alert user)"
+    },
+    {
+      "name": "schemaVersion",
+      "type": "int",
+      "default": 1
+    }
+  ]
+}

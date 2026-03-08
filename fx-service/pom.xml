@@ -19,7 +19,46 @@
 		<testcontainers.version>1.19.7</testcontainers.version>
 		<resilience4j.version>2.2.0</resilience4j.version>
 		<wiremock.version>3.4.2</wiremock.version>
+		<!--
+			Avro + Confluent versions must match across all services.
+			Defined here; other services should use a parent POM or property file
+			to keep these in sync. Mismatched versions are the #1 cause of
+			"magic byte" deserialization errors at runtime.
+		-->
+		<avro.version>1.11.3</avro.version>
+		<!--
+			Confluent Platform 7.6.x ships kafka-avro-serializer 7.6.x.
+			Must match the Schema Registry version in docker-compose / K8s.
+			confluent-version IS NOT the same as cp-kafka image tag.
+		-->
+		<confluent.version>7.6.0</confluent.version>
 	</properties>
+
+	<!--
+		Confluent packages are NOT on Maven Central.
+		They live on Confluent's own repository.
+		Without this, maven will fail to resolve kafka-avro-serializer.
+	-->
+	<repositories>
+		<repository>
+			<id>confluent</id>
+			<name>Confluent Platform</name>
+			<url>https://packages.confluent.io/maven/</url>
+			<releases>
+				<enabled>true</enabled>
+			</releases>
+			<snapshots>
+				<enabled>false</enabled>
+			</snapshots>
+		</repository>
+	</repositories>
+
+	<pluginRepositories>
+		<pluginRepository>
+			<id>confluent</id>
+			<url>https://packages.confluent.io/maven/</url>
+		</pluginRepository>
+	</pluginRepositories>
 
 	<dependencies>
 		<dependency>
@@ -59,6 +98,40 @@
 		<dependency>
 			<groupId>org.springframework.kafka</groupId>
 			<artifactId>spring-kafka</artifactId>
+		</dependency>
+
+		<!-- ─── Avro + Schema Registry ─────────────────────────────────────────
+			 kafka-avro-serializer bundles:
+			   - avro (org.apache.avro)
+			   - confluent schema-registry-client
+			   - KafkaAvroSerializer / KafkaAvroDeserializer
+			 Do NOT add org.apache.avro:avro separately — version conflicts.
+		-->
+		<dependency>
+			<groupId>io.confluent</groupId>
+			<artifactId>kafka-avro-serializer</artifactId>
+			<version>${confluent.version}</version>
+			<!--
+				Exclude kafka-clients to prevent version conflict with spring-kafka.
+				Spring Kafka manages kafka-clients version via spring-boot-starter-parent.
+			-->
+			<exclusions>
+				<exclusion>
+					<groupId>org.apache.kafka</groupId>
+					<artifactId>kafka-clients</artifactId>
+				</exclusion>
+			</exclusions>
+		</dependency>
+
+		<!--
+			avro-maven-plugin generates Java classes from .avsc at compile time.
+			The runtime dependency on avro is already pulled in by kafka-avro-serializer,
+			but we need this for the generated SpecificRecord classes at compile time.
+		-->
+		<dependency>
+			<groupId>org.apache.avro</groupId>
+			<artifactId>avro</artifactId>
+			<version>${avro.version}</version>
 		</dependency>
 
 		<!-- Resilience4j -->
@@ -141,6 +214,17 @@
 			<artifactId>reactor-test</artifactId>
 			<scope>test</scope>
 		</dependency>
+		<!--
+			Testcontainers Schema Registry module.
+			Spins up a real confluentinc/cp-schema-registry container in integration tests.
+			Avoids mocking the registry — tests validate real schema registration/compatibility.
+		-->
+		<dependency>
+			<groupId>io.confluent</groupId>
+			<artifactId>kafka-schema-registry-client</artifactId>
+			<version>${confluent.version}</version>
+			<scope>test</scope>
+		</dependency>
 	</dependencies>
 
 	<build>
@@ -170,6 +254,65 @@
 						</path>
 					</annotationProcessorPaths>
 				</configuration>
+			</plugin>
+			<plugin>
+				<groupId>org.apache.avro</groupId>
+				<artifactId>avro-maven-plugin</artifactId>
+				<version>${avro.version}</version>
+				<executions>
+					<!--
+						Second execution for fx-service schemas.
+						Payment Service consumes fx events — it needs fraud event classes
+						locally for deserialization. In a real setup these would come from
+						a shared avro-schemas Maven module. Here we include them directly
+						to keep the portfolio self-contained without a multi-module build.
+					-->
+					<execution>
+						<id>generate-fx-avro</id>
+						<phase>generate-sources</phase>
+						<goals>
+							<goal>schema</goal>
+						</goals>
+						<configuration>
+							<sourceDirectory>${project.basedir}/../fx-service/src/main/avro
+							</sourceDirectory>
+							<outputDirectory>${project.build.directory}/generated-sources/avro</outputDirectory>
+							<stringType>String</stringType>
+							<enableDecimalLogicalType>true</enableDecimalLogicalType>
+							<fieldVisibility>PRIVATE</fieldVisibility>
+							<createSetters>false</createSetters>
+						</configuration>
+					</execution>
+				</executions>
+			</plugin>
+
+			<!-- Unit tests only (fast) -->
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-surefire-plugin</artifactId>
+				<configuration>
+					<excludedGroups>integration</excludedGroups>
+				</configuration>
+			</plugin>
+
+			<!-- Integration tests with Testcontainers (mvn verify) -->
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-failsafe-plugin</artifactId>
+				<configuration>
+					<groups>integration</groups>
+					<includes>
+						<include>**/*IntegrationTest.java</include>
+					</includes>
+				</configuration>
+				<executions>
+					<execution>
+						<goals>
+							<goal>integration-test</goal>
+							<goal>verify</goal>
+						</goals>
+					</execution>
+				</executions>
 			</plugin>
 		</plugins>
 	</build>

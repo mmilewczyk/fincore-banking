@@ -1,18 +1,15 @@
 package com.matcodem.fincore.payment.application;
 
+import java.util.List;
 import java.util.NoSuchElementException;
-import java.util.UUID;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import com.matcodem.fincore.payment.adapter.out.client.AccountServiceWebClient.AccountServiceUnavailableException;
-import com.matcodem.fincore.payment.adapter.out.client.FxServiceWebClient;
-import com.matcodem.fincore.payment.adapter.out.client.FxServiceWebClient.FxServiceUnavailableException;
-import com.matcodem.fincore.payment.domain.model.Money;
+import com.matcodem.fincore.payment.application.processor.PaymentProcessor;
+import com.matcodem.fincore.payment.domain.event.DomainEvent;
 import com.matcodem.fincore.payment.domain.model.Payment;
 import com.matcodem.fincore.payment.domain.model.PaymentId;
-import com.matcodem.fincore.payment.domain.model.PaymentType;
 import com.matcodem.fincore.payment.domain.port.in.ProcessPaymentUseCase;
 import com.matcodem.fincore.payment.domain.port.out.AccountServiceClient;
 import com.matcodem.fincore.payment.domain.port.out.OutboxEventPublisher;
@@ -27,37 +24,43 @@ import lombok.extern.slf4j.Slf4j;
 /**
  * Handles payment processing, fraud rejection, and fraud-confirmed reversals.
  * <p>
- * ── processPayment() — the critical happy path ────────────────────────────────
+ * ── TRANSACTION STRATEGY ──────────────────────────────────────────────────────
  * <p>
- * Called after fraud.case.approved event is received from Fraud Detection Service.
+ * processPayment() is intentionally NOT @Transactional at the top level.
+ * The distributed lock (Redisson MultiLock) must be acquired BEFORE opening
+ * a DB transaction, otherwise the transaction can be held open while waiting
+ * for the lock — exhausting the connection pool under contention.
  * <p>
- * Steps:
- * 1. Load payment, verify PENDING (idempotency guard)
- * 2. Acquire distributed lock on source + target accounts (Redisson MultiLock)
- * → sorted lock order prevents deadlocks across concurrent payments
- * 3. Re-fetch inside lock to catch race conditions
- * 4. [FX] If FX_CONVERSION: call FX Service synchronously — rate locked, conversion persisted
- * 5. Debit source account via Account Service
- * 6. Credit target account via Account Service
- * 7. Mark COMPLETED, save, publish via outbox
+ * Transaction boundary is inside executeUnderLock(), which opens a new
+ *
+ * @Transactional scope after the lock is acquired. This ensures:
+ * - Lock held for the minimum necessary duration
+ * - DB transaction open only during actual work (re-fetch, modify, save)
+ * - If the transaction rolls back, the lock is still released in finally
  * <p>
- * ── Failure compensation ───────────────────────────────────────────────────────
+ * ── PROCESSING STEPS ─────────────────────────────────────────────────────────
  * <p>
- * If debit succeeds but credit fails:
- * → We mark payment FAILED and log at CRITICAL level
- * → A human (ops) must reconcile manually or an async compensation job handles it
- * → We do NOT attempt re-credit here — that call may also fail and leave us
- * in a deeper inconsistent state
- * → In production: PagerDuty alert + automatic JIRA ticket creation
+ * 1. Load payment, verify PENDING (pre-lock optimistic check)
+ * 2. Acquire Redisson MultiLock on [sourceAccountId, targetAccountId]
+ * — sorted alphabetically to prevent deadlock
+ * 3. Re-fetch inside lock + transaction (eliminates race condition window)
+ * 4. startProcessing() — status PENDING → PROCESSING
+ * 5. [FX_CONVERSION only] FX Service call — synchronous, rate locked
+ * 6. Account Service debit — source account
+ * 7. Account Service credit — target account
+ * 8. complete() — status PROCESSING → COMPLETED
+ * 9. save() + publish domain events to outbox (same transaction)
  * <p>
- * If FX conversion fails:
- * → No money has moved — mark FAILED, no compensation needed
+ * ── PARTIAL FAILURE / COMPENSATION ───────────────────────────────────────────
  * <p>
- * ── initiateReversalIfNeeded() ─────────────────────────────────────────────────
- * <p>
- * Called after fraud.confirmed (compliance confirmed a completed payment was fraudulent).
- * If payment is COMPLETED: reverse the money movement (debit target, credit source).
- * If payment is PENDING/PROCESSING: reject as fraudulent (no money moved yet).
+ * If debit OK but credit FAILS:
+ * The payment is marked FAILED. Money is debited but not credited.
+ * This is an inconsistency that CANNOT be resolved here automatically
+ * (a retry credit might also fail, worsening the state).
+ * → CRITICAL log emitted — ops alerted via Prometheus alert rule
+ * → Payment stored as FAILED with full reason for audit trail
+ * → Compensation job or manual ops intervention required
+ * In production: PagerDuty + auto JIRA ticket.
  */
 @Slf4j
 @Service
@@ -66,76 +69,29 @@ public class ProcessPaymentService implements ProcessPaymentUseCase {
 
 	private final PaymentRepository paymentRepository;
 	private final AccountServiceClient accountServiceClient;
-	private final FxServiceWebClient fxServiceClient;
 	private final OutboxEventPublisher outboxEventPublisher;
 	private final PaymentLockService lockService;
 	private final MeterRegistry meterRegistry;
+	private final PaymentProcessor paymentProcessor;
 
 	@Override
 	@Timed(value = "payment.process.duration")
 	public void processPayment(String paymentId) {
 		log.info("Processing payment: {}", paymentId);
 
+		// Pre-lock check: avoids acquiring a lock for an already-terminal payment.
+		// This is an optimistic read — re-checked under lock before any mutation.
 		Payment payment = loadPayment(paymentId);
-
 		if (!payment.isPending()) {
-			log.warn("Payment {} is not PENDING ({}), skipping", paymentId, payment.getStatus());
+			log.warn("Payment {} is not PENDING ({}) — skipping", paymentId, payment.getStatus());
 			return;
 		}
 
 		lockService.executeWithLock(
 				payment.getSourceAccountId(),
 				payment.getTargetAccountId(),
-				() -> executeUnderLock(paymentId)
+				() -> paymentProcessor.executeUnderLock(paymentId)
 		);
-	}
-
-	/**
-	 * Separated from processPayment() for clarity — this is the work done
-	 * while holding the distributed lock.
-	 */
-	private void executeUnderLock(String paymentId) {
-		// Re-fetch: another instance may have claimed it between our check and lock acquisition
-		Payment payment = loadPayment(paymentId);
-		if (!payment.isPending()) {
-			log.warn("Payment {} already claimed by another instance ({}), skipping",
-					paymentId, payment.getStatus());
-			return;
-		}
-
-		payment.startProcessing();
-
-		try {
-			if (payment.getType() == PaymentType.FX_CONVERSION) {
-				performFxConversion(payment);
-			}
-
-			accountServiceClient.debitAccount(
-					payment.getSourceAccountId(), payment.getAmount(), paymentId);
-
-			accountServiceClient.creditAccount(
-					payment.getTargetAccountId(), payment.getAmount(), paymentId);
-
-			payment.complete();
-			saveWithOutbox(payment);
-
-			meterRegistry.counter("payment.completed", "type", payment.getType().name()).increment();
-			log.info("Payment {} COMPLETED", paymentId);
-
-		} catch (FxServiceUnavailableException ex) {
-			// FX failed before any money moved — safe to fail
-			log.error("FX conversion failed for payment {}: {}", paymentId, ex.getMessage());
-			payment.fail("FX conversion unavailable: " + ex.getMessage());
-			saveWithOutbox(payment);
-			meterRegistry.counter("payment.failed", "reason", "fx_service").increment();
-
-		} catch (AccountServiceUnavailableException ex) {
-			// Debit or credit failed — may be a partial failure (see class Javadoc)
-			log.error("Account Service failed for payment {}: {}", paymentId, ex.getMessage());
-			payment.fail("Account Service unavailable: " + ex.getMessage());
-			saveWithOutbox(payment);
-			meterRegistry.counter("payment.failed", "reason", "account_service").increment();
-		}
 	}
 
 	@Override
@@ -144,7 +100,7 @@ public class ProcessPaymentService implements ProcessPaymentUseCase {
 		log.warn("Fraud rejection for payment {}: {}", paymentId, reason);
 		Payment payment = loadPayment(paymentId);
 		payment.rejectAsFraudulent(reason);
-		saveWithOutbox(payment);
+		saveAndPublish(payment);
 		meterRegistry.counter("payment.fraud.rejected").increment();
 	}
 
@@ -155,9 +111,9 @@ public class ProcessPaymentService implements ProcessPaymentUseCase {
 		Payment payment = loadPayment(paymentId);
 		if (payment.isPending() || payment.isProcessing()) {
 			payment.fail(reason);
-			saveWithOutbox(payment);
+			saveAndPublish(payment);
 		} else {
-			log.warn("Payment {} in non-faileable state {}, skipping", paymentId, payment.getStatus());
+			log.warn("Payment {} in non-failable state {} — skipping", paymentId, payment.getStatus());
 		}
 	}
 
@@ -165,66 +121,57 @@ public class ProcessPaymentService implements ProcessPaymentUseCase {
 	@Transactional
 	public void initiateReversalIfNeeded(String paymentId, String reason) {
 		Payment payment = loadPayment(paymentId);
-
 		switch (payment.getStatus()) {
 			case COMPLETED -> reverseCompletedPayment(payment, reason);
 			case PENDING, PROCESSING -> rejectForFraud(paymentId, "Fraud confirmed: " + reason);
-			default -> log.info("Payment {} already in terminal state {}, no action needed",
+			default -> log.info("Payment {} already terminal ({}) — no action",
 					paymentId, payment.getStatus());
 		}
 	}
 
 	private void reverseCompletedPayment(Payment payment, String reason) {
-		String paymentId = payment.getId().value().toString();
-		log.error("REVERSAL NEEDED for payment {} — fraud confirmed: {}", paymentId, reason);
+		String paymentId = payment.getId().toString();
+		log.error("REVERSAL REQUIRED for payment {} — fraud confirmed: {}", paymentId, reason);
 
 		try {
+			// Reverse: debit the recipient, credit the sender
+			String reversalRef = "REVERSAL-" + paymentId;
 			accountServiceClient.debitAccount(
-					payment.getTargetAccountId(), payment.getAmount(), "REVERSAL-" + paymentId);
+					payment.getTargetAccountId(), payment.getAmount(), reversalRef);
 			accountServiceClient.creditAccount(
-					payment.getSourceAccountId(), payment.getAmount(), "REVERSAL-" + paymentId);
+					payment.getSourceAccountId(), payment.getAmount(), reversalRef);
 
-			log.info("Reversal completed for payment {}", paymentId);
+			log.info("Reversal COMPLETED for payment {}", paymentId);
 			meterRegistry.counter("payment.reversal.completed").increment();
 
 		} catch (Exception ex) {
-			// CRITICAL: money already moved, reversal failed — ops must intervene
-			log.error("CRITICAL: Reversal FAILED for payment {} — MANUAL INTERVENTION REQUIRED: {}",
+			// Reversal failed after fraud confirmed — money cannot be automatically recovered.
+			// This requires human intervention. DO NOT retry here — could worsen state.
+			log.error("CRITICAL: Reversal FAILED for payment {} — MANUAL INTERVENTION REQUIRED. Reason: {}",
 					paymentId, ex.getMessage());
 			meterRegistry.counter("payment.reversal.failed").increment();
-			// TODO: trigger PagerDuty alert + auto-create JIRA ticket
+			// TODO: PagerDuty trigger + auto-create JIRA ticket via webhook
 		}
 	}
 
-	private void performFxConversion(Payment payment) {
-		String paymentId = payment.getId().value().toString();
-		Money money = payment.getAmount();
-		String pair = money.getCurrency().getCode() + "PLN";
-
-		FxServiceWebClient.FxConversionResult fx = fxServiceClient.convert(
-				paymentId,
-				payment.getSourceAccountId(),
-				payment.getInitiatedBy(),
-				pair,
-				money.getAmount(),
-				"BUY_BASE"
-		);
-
-		log.info("FX locked for payment {} — {} → {} PLN at {} (fee: {}, conversionId: {})",
-				paymentId, money.getAmount(), fx.convertedAmount(),
-				fx.appliedRate(), fx.fee(), fx.conversionId());
-	}
-
-	@Transactional
-	protected void saveWithOutbox(Payment payment) {
+	/**
+	 * Persist the payment and flush all accumulated domain events to the outbox.
+	 * Called within an active @Transactional context — payment row + outbox rows
+	 * are written atomically.
+	 * <p>
+	 * Note: pullDomainEvents() clears the in-memory list — idempotent, safe to call
+	 * multiple times (second call returns empty list).
+	 */
+	private void saveAndPublish(Payment payment) {
 		paymentRepository.save(payment);
-		payment.pullDomainEvents()
-				.forEach(event -> outboxEventPublisher.publish(event, "Payment"));
+		List<DomainEvent> events = payment.pullDomainEvents();
+		events.forEach(event -> outboxEventPublisher.publish(event, "Payment"));
+		log.debug("Saved payment {} ({}) and queued {} domain event(s) to outbox",
+				payment.getId(), payment.getStatus(), events.size());
 	}
 
 	private Payment loadPayment(String paymentId) {
-		PaymentId id = PaymentId.of(UUID.fromString(paymentId));
-		return paymentRepository.findById(id)
+		return paymentRepository.findById(PaymentId.of(paymentId))
 				.orElseThrow(() -> new NoSuchElementException("Payment not found: " + paymentId));
 	}
 }

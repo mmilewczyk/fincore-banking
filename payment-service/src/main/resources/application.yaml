@@ -37,23 +37,40 @@ spring:
     bootstrap-servers: localhost:9092
     producer:
       key-serializer: org.apache.kafka.common.serialization.StringSerializer
-      value-serializer: org.apache.kafka.common.serialization.StringSerializer
+      # Avro serializer — encodes messages as Confluent wire format:
+      # [magic byte 0x00][schema-id 4 bytes][avro payload]
+      value-serializer: io.confluent.kafka.serializers.KafkaAvroSerializer
       acks: all
       retries: 10
       properties:
-        # Exactly-once semantics at producer level (idempotent + transactional not needed here
-        # because we use the Outbox pattern — Kafka is written by OutboxPoller, not in-request)
         enable.idempotence: true
         max.in.flight.requests.per.connection: 5
         delivery.timeout.ms: 120000
+        # Schema Registry — required by KafkaAvroSerializer
+        schema.registry.url: ${kafka.schema-registry.url:http://localhost:8081}
+        # auto.register.schemas: true in local dev, false in prod (overridden by env/profile)
+        auto.register.schemas: true
     consumer:
       group-id: payment-service
       auto-offset-reset: earliest
-      enable-auto-commit: false   # Manual ACK only — never lose a message
+      enable-auto-commit: false
       max-poll-records: 50
       properties:
-        # If consumer takes > 5min to process a batch, Kafka will rebalance
         max.poll.interval.ms: 300000
+        schema.registry.url: ${kafka.schema-registry.url:http://localhost:8081}
+        # specific.avro.reader: deserialize into generated SpecificRecord classes
+        specific.avro.reader: true
+
+# ─── Schema Registry ──────────────────────────────────────────────────────────
+# Confluent Schema Registry URL. Used by both KafkaAvroSerializer (producer)
+# and KafkaAvroDeserializer (consumer) for schema lookup and registration.
+#
+# Local dev: http://localhost:8081 (docker-compose)
+# K8s: http://schema-registry.fincore.svc.cluster.local:8081
+# Override via: KAFKA_SCHEMA_REGISTRY_URL env var in K8s Deployment
+kafka:
+  schema-registry:
+    url: http://localhost:8081
 
   data:
     redis:

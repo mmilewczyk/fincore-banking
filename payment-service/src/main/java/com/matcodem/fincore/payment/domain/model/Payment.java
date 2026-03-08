@@ -142,7 +142,7 @@ public class Payment {
 		}
 		this.status = PaymentStatus.COMPLETED;
 		this.updatedAt = Instant.now();
-		recordEvent(new PaymentCompletedEvent(id, sourceAccountId, targetAccountId, amount, updatedAt));
+		recordEvent(new PaymentCompletedEvent(id, sourceAccountId, targetAccountId, amount, updatedAt, type));
 	}
 
 	/**

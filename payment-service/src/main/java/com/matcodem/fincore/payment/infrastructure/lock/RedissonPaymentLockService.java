@@ -51,33 +51,30 @@ public class RedissonPaymentLockService implements PaymentLockService {
 	public void executeWithLock(String sourceAccountId, String targetAccountId, Runnable action) {
 		Timer.Sample sample = Timer.start(meterRegistry);
 
-		List<RLock> locks = getOrderedLocks(sourceAccountId, targetAccountId);
+		List<RLock> locks = orderedLocks(sourceAccountId, targetAccountId);
 		RLock multiLock = redissonClient.getMultiLock(locks.toArray(new RLock[0]));
 
 		try {
 			boolean acquired = multiLock.tryLock(WAIT_TIMEOUT_SECONDS, TimeUnit.SECONDS);
-			// No leaseTime = watchdog auto-renews the lock
 			if (!acquired) {
 				meterRegistry.counter("payment.lock.timeout").increment();
 				throw new LockAcquisitionException(
 						"Could not acquire lock for accounts [%s, %s] within %ds"
-								.formatted(sourceAccountId, targetAccountId, WAIT_TIMEOUT_SECONDS)
-				);
+								.formatted(sourceAccountId, targetAccountId, WAIT_TIMEOUT_SECONDS));
 			}
 
-			log.debug("Lock acquired for accounts [{}, {}], executing action",
-					sourceAccountId, targetAccountId);
+			meterRegistry.counter("payment.lock.acquired").increment();
+			log.debug("Lock acquired [{}, {}]", sourceAccountId, targetAccountId);
 
 			try {
 				action.run();
 			} finally {
-				// Always release — watchdog stops here
 				safeUnlock(multiLock, sourceAccountId, targetAccountId);
 			}
 
 		} catch (InterruptedException e) {
 			Thread.currentThread().interrupt();
-			throw new LockAcquisitionException("Interrupted while waiting for lock", e);
+			throw new LockAcquisitionException("Interrupted waiting for lock", e);
 		} finally {
 			sample.stop(meterRegistry.timer("payment.lock.duration"));
 		}
@@ -87,24 +84,24 @@ public class RedissonPaymentLockService implements PaymentLockService {
 	 * Always sort account IDs alphabetically to prevent deadlocks.
 	 * Both [A→B] and [B→A] payments will try to lock A first.
 	 */
-	private List<RLock> getOrderedLocks(String sourceAccountId, String targetAccountId) {
-		String[] sortedIds = new String[]{sourceAccountId, targetAccountId};
-		Arrays.sort(sortedIds);
-
-		return Arrays.stream(sortedIds)
+	private List<RLock> orderedLocks(String id1, String id2) {
+		String[] sorted = {id1, id2};
+		Arrays.sort(sorted);
+		return Arrays.stream(sorted)
 				.map(id -> redissonClient.getLock(LOCK_PREFIX + id))
 				.toList();
 	}
 
-	private void safeUnlock(RLock lock, String sourceId, String targetId) {
+	private void safeUnlock(RLock lock, String src, String tgt) {
 		try {
 			if (lock.isHeldByCurrentThread()) {
 				lock.unlock();
 				meterRegistry.counter("payment.lock.released").increment();
-				log.debug("Lock released for accounts [{}, {}]", sourceId, targetId);
+				log.debug("Lock released [{}, {}]", src, tgt);
 			}
 		} catch (Exception e) {
-			log.warn("Error releasing lock [{}, {}]: {}", sourceId, targetId, e.getMessage());
+			// Lock may have expired — log but don't re-throw (already in finally)
+			log.warn("Error releasing lock [{}, {}]: {}", src, tgt, e.getMessage());
 		}
 	}
 }

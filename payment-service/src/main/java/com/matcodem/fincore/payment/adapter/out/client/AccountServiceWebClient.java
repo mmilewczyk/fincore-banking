@@ -1,6 +1,5 @@
 package com.matcodem.fincore.payment.adapter.out.client;
 
-import java.math.BigDecimal;
 import java.util.Map;
 
 import org.springframework.beans.factory.annotation.Value;
@@ -12,21 +11,28 @@ import com.matcodem.fincore.payment.domain.model.Money;
 import com.matcodem.fincore.payment.domain.port.out.AccountServiceClient;
 
 import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
+import io.github.resilience4j.retry.annotation.Retry;
 import lombok.extern.slf4j.Slf4j;
 
 /**
- * Feign-style WebClient adapter to Account Service.
+ * REST adapter to Account Service — implements AccountServiceClient port.
  * <p>
- * Uses K8s DNS: http://account-service.fincore.svc.cluster.local:8081
+ * Uses the shared WebClient.Builder from InfrastructureConfig, which provides
+ * Netty-level timeouts (connect 3s, read/write 5s). This prevents indefinite
+ * blocking of Tomcat threads during account service outages.
  * <p>
- * Circuit Breaker (Resilience4j):
- * - 5 failures in 10s sliding window → OPEN
- * - 30s wait → HALF_OPEN → 3 test calls
- * - Fallback: throw AccountServiceUnavailableException
- * → Payment Service marks payment FAILED and publishes event
+ * Resilience4j:
+ *
+ * @CircuitBreaker — opens after 50% failure rate over sliding window of 10 calls.
+ * OPEN state: calls fail-fast for 15s, no upstream requests sent.
+ * @Retry — 3 attempts, 500ms exponential backoff, only on transient errors.
+ * Does NOT retry on 4xx (account not found, insufficient funds) —
+ * those are non-retryable business errors.
  * <p>
- * Synchronous because debit/credit need acknowledgement before
- * the payment can be marked COMPLETED. Money must move atomically.
+ * HTTP 404 from Account Service is treated as AccountServiceUnavailableException
+ * rather than NoSuchElementException because the payment-service should not silently
+ * proceed with debit/credit if the account is unexpectedly missing — that's an
+ * infrastructure inconsistency, not a user error.
  */
 @Slf4j
 @Component
@@ -34,19 +40,18 @@ public class AccountServiceWebClient implements AccountServiceClient {
 
 	private final WebClient webClient;
 
-	private static final String SERVICE_NAME = "account-service";
-
 	public AccountServiceWebClient(
-			WebClient.Builder builder,
+			WebClient.Builder webClientBuilder,
 			@Value("${services.account.base-url:http://account-service.fincore.svc.cluster.local:8081}")
 			String baseUrl) {
-		this.webClient = builder.baseUrl(baseUrl).build();
+		this.webClient = webClientBuilder.baseUrl(baseUrl).build();
 	}
 
 	@Override
-	@CircuitBreaker(name = SERVICE_NAME, fallbackMethod = "debitFallback")
-	public void debitAccount(String accountId, Money amount, String reference) {
-		log.info("Debiting account {} - amount: {}, ref: {}", accountId, amount.toString(), reference);
+	@CircuitBreaker(name = "account-service", fallbackMethod = "debitFallback")
+	@Retry(name = "account-service")
+	public void debitAccount(String accountId, Money amount, String paymentReference) {
+		log.info("Debiting account {} — amount: {}, ref: {}", accountId, amount, paymentReference);
 
 		webClient.post()
 				.uri("/api/v1/accounts/{id}/debit", accountId)
@@ -54,19 +59,20 @@ public class AccountServiceWebClient implements AccountServiceClient {
 				.bodyValue(Map.of(
 						"amount", amount.getAmount(),
 						"currency", amount.getCurrency().getCode(),
-						"reference", reference
+						"reference", paymentReference
 				))
 				.retrieve()
 				.toBodilessEntity()
 				.block();
 
-		log.info("Debit successful - account: {}, ref: {}", accountId, reference);
+		log.info("Debit OK — account: {}, ref: {}", accountId, paymentReference);
 	}
 
 	@Override
-	@CircuitBreaker(name = SERVICE_NAME, fallbackMethod = "creditFallback")
-	public void creditAccount(String accountId, Money amount, String reference) {
-		log.info("Crediting account {} - amount: {}, ref: {}", accountId, amount, reference);
+	@CircuitBreaker(name = "account-service", fallbackMethod = "creditFallback")
+	@Retry(name = "account-service")
+	public void creditAccount(String accountId, Money amount, String paymentReference) {
+		log.info("Crediting account {} — amount: {}, ref: {}", accountId, amount, paymentReference);
 
 		webClient.post()
 				.uri("/api/v1/accounts/{id}/credit", accountId)
@@ -74,51 +80,50 @@ public class AccountServiceWebClient implements AccountServiceClient {
 				.bodyValue(Map.of(
 						"amount", amount.getAmount(),
 						"currency", amount.getCurrency().getCode(),
-						"reference", reference
+						"reference", paymentReference
 				))
 				.retrieve()
 				.toBodilessEntity()
 				.block();
 
-		log.info("Credit successful — account: {}, ref: {}", accountId, reference);
+		log.info("Credit OK — account: {}, ref: {}", accountId, paymentReference);
 	}
 
-	@CircuitBreaker(name = SERVICE_NAME, fallbackMethod = "getAccountFallback")
 	@Override
+	@CircuitBreaker(name = "account-service", fallbackMethod = "getAccountFallback")
+	@Retry(name = "account-service")
 	public AccountInfo getAccountInfo(String accountId) {
-		var response = webClient.get()
+		@SuppressWarnings("unchecked")
+		Map<String, Object> response = webClient.get()
 				.uri("/api/v1/accounts/{id}", accountId)
 				.retrieve()
 				.bodyToMono(Map.class)
 				.block();
 
-		if (response == null) throw new AccountServiceUnavailableException("Empty response for account: " + accountId);
+		if (response == null) {
+			throw new AccountServiceUnavailableException("Empty response for account: " + accountId);
+		}
 
-		return new AccountServiceClient.AccountInfo(
+		return new AccountInfo(
 				(String) response.get("id"),
 				(String) response.get("currency"),
-				(Boolean) response.get("status")
+				"ACTIVE".equals(response.get("status"))
 		);
 	}
 
-	private void debitFallback(String accountId, BigDecimal amount, String currency,
-	                           String reference, Exception ex) {
-		log.error("Account Service unavailable — debit failed for account {}: {}", accountId, ex.getMessage());
-		throw new AccountServiceUnavailableException(
-				"Account Service unavailable — debit failed for account: " + accountId);
+	private void debitFallback(String accountId, Money amount, String ref, Throwable ex) {
+		log.error("Account Service unavailable for debit on {}: {}", accountId, ex.getMessage());
+		throw new AccountServiceUnavailableException("Account Service unavailable — debit: " + accountId);
 	}
 
-	private void creditFallback(String accountId, BigDecimal amount, String currency,
-	                            String reference, Exception ex) {
-		log.error("Account Service unavailable — credit failed for account {}: {}", accountId, ex.getMessage());
-		throw new AccountServiceUnavailableException(
-				"Account Service unavailable — credit failed for account: " + accountId);
+	private void creditFallback(String accountId, Money amount, String ref, Throwable ex) {
+		log.error("Account Service unavailable for credit on {}: {}", accountId, ex.getMessage());
+		throw new AccountServiceUnavailableException("Account Service unavailable — credit: " + accountId);
 	}
 
-	private AccountInfo getAccountFallback(String accountId, Exception ex) {
-		log.error("Account Service unavailable — cannot fetch account {}: {}", accountId, ex.getMessage());
-		throw new AccountServiceUnavailableException(
-				"Account Service unavailable — cannot fetch account: " + accountId);
+	private AccountInfo getAccountFallback(String accountId, Throwable ex) {
+		log.error("Account Service unavailable for getAccountInfo on {}: {}", accountId, ex.getMessage());
+		throw new AccountServiceUnavailableException("Account Service unavailable — get: " + accountId);
 	}
 
 	public static class AccountServiceUnavailableException extends RuntimeException {

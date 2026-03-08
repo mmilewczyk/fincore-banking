@@ -1,0 +1,80 @@
+{
+  "type": "record",
+  "name": "FxConversionExecutedEvent",
+  "namespace": "com.matcodem.fincore.fx.avro",
+  "doc": "Published when an FX conversion completes successfully. Consumed by payment-service to proceed with credit step.",
+  "fields": [
+    {
+      "name": "eventId",
+      "type": "string"
+    },
+    {
+      "name": "occurredAt",
+      "type": {
+        "type": "long",
+        "logicalType": "timestamp-millis"
+      }
+    },
+    {
+      "name": "conversionId",
+      "type": "string"
+    },
+    {
+      "name": "paymentId",
+      "type": "string"
+    },
+    {
+      "name": "accountId",
+      "type": "string"
+    },
+    {
+      "name": "currencyPair",
+      "type": "string",
+      "doc": "e.g. EUR/PLN"
+    },
+    {
+      "name": "sourceAmount",
+      "type": {
+        "type": "bytes",
+        "logicalType": "decimal",
+        "precision": 19,
+        "scale": 4
+      }
+    },
+    {
+      "name": "convertedAmount",
+      "type": {
+        "type": "bytes",
+        "logicalType": "decimal",
+        "precision": 19,
+        "scale": 4
+      },
+      "doc": "Amount after conversion in target currency"
+    },
+    {
+      "name": "appliedRate",
+      "type": {
+        "type": "bytes",
+        "logicalType": "decimal",
+        "precision": 19,
+        "scale": 8
+      },
+      "doc": "The rate actually applied (bid or ask, depending on direction)"
+    },
+    {
+      "name": "fee",
+      "type": {
+        "type": "bytes",
+        "logicalType": "decimal",
+        "precision": 19,
+        "scale": 4
+      },
+      "doc": "FX fee charged — included for transparency and compliance reporting"
+    },
+    {
+      "name": "schemaVersion",
+      "type": "int",
+      "default": 1
+    }
+  ]
+}

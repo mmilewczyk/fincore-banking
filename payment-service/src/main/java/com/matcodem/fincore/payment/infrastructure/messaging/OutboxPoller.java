@@ -15,35 +15,40 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
 /**
- * Outbox Processor — the missing piece that makes at-least-once delivery real.
+ * Outbox Poller — publishes pending domain events to Kafka.
  * <p>
- * Pattern:
- * 1. Business operation saves Payment + OutboxMessage in ONE DB transaction
- * 2. This scheduler polls PENDING outbox messages and publishes them to Kafka
- * 3. On ACK from Kafka → mark SENT
- * 4. On failure → increment retry count; after 5 attempts → DEAD_LETTER
+ * ── PATTERN ───────────────────────────────────────────────────────────────────
+ * The Transactional Outbox pattern guarantees at-least-once event delivery:
+ * 1. Payment + outbox row written atomically in one DB transaction
+ * 2. This poller reads PENDING outbox rows and publishes to Kafka
+ * 3. On broker ACK → row marked SENT in same transaction
  * <p>
- * Concurrency safety:
- * SELECT FOR UPDATE SKIP LOCKED ensures that if multiple instances of
- * payment-service are running (K8s replicas), each message is processed
- * by exactly one instance. The lock is held for the duration of the
- * publish + update, then released.
+ * ── TRANSACTION DESIGN ────────────────────────────────────────────────────────
+ * pollAndPublish() has NO @Transactional — it iterates rows and delegates each
+ * to publishSingle() which opens its own REQUIRES_NEW transaction.
  * <p>
- * Topic routing:
- * eventType "payment.initiated"   → fincore.payments.payment-initiated
- * eventType "payment.completed"   → fincore.payments.payment-completed
- * eventType "payment.failed"      → fincore.payments.payment-failed
- * eventType "payment.fraud.*"     → fincore.payments.payment-fraud-rejected
- * eventType "payment.cancelled"   → fincore.payments.payment-cancelled
+ * Why REQUIRES_NEW per message (not one big transaction for the batch)?
+ * - A single Kafka failure must not roll back the entire batch
+ * - SELECT FOR UPDATE SKIP LOCKED is held per-row for minimum duration
+ * - Spring's @Transactional(REQUIRES_NEW) suspends the caller's transaction
+ * (none here) and opens a fresh one, so the JPA flush + commit happens
+ * immediately after markSent/markFailed — not at end of outer method
  * <p>
- * Kafka key = aggregateId (paymentId) → ordering guaranteed per payment
- * within a partition.
+ * ── CONCURRENCY ───────────────────────────────────────────────────────────────
+ * SELECT FOR UPDATE SKIP LOCKED (in SpringDataOutboxRepository) ensures that
+ * multiple payment-service pods each claim a distinct batch of rows.
+ * No two pods will publish the same message. Combined with Kafka producer
+ * idempotence (enable.idempotence=true) this is safe at-least-once delivery.
  * <p>
- * Monitoring:
- * outbox.published.total   — successful publishes
- * outbox.failed.total      — publish failures (retriable)
- * outbox.dead_letter.total — messages that exhausted retries
- * outbox.pending.gauge     — current backlog (alert if > threshold)
+ * ── KAFKA ACK STRATEGY (.get() vs whenComplete) ───────────────────────────────
+ * kafkaTemplate.send(...).get() blocks until the broker acknowledges the write.
+ * The DB markSent() call happens only after the broker ACK, within the same
+ * transaction. If the JVM crashes between ACK and commit, the row stays PENDING
+ * and is republished on next poll — Kafka consumers must be idempotent.
+ * <p>
+ * Alternative (whenComplete) runs in Kafka callback thread, outside Spring's
+ * transaction context. markSent() would not be part of the DB transaction.
+ * Chosen against: harder to reason about, same at-least-once outcome.
  */
 @Slf4j
 @Component
@@ -54,80 +59,62 @@ public class OutboxPoller {
 	private final KafkaTemplate<String, String> kafkaTemplate;
 	private final MeterRegistry meterRegistry;
 
-	private static final String TOPIC_PREFIX = "fincore.payments.";
 	private static final int BATCH_SIZE = 100;
 
 	/**
-	 * Poll every 500ms. Fixed delay (not rate) — next run starts after
-	 * current run + 500ms, preventing overlap under load.
-	 * <p>
-	 * Under normal load: 100 messages/500ms = 200 msg/s throughput.
-	 * If backlog grows, increase BATCH_SIZE or decrease fixedDelay.
+	 * fixedDelay — next poll starts 500ms AFTER current poll completes.
+	 * Prevents concurrent execution on a single instance.
+	 * Cross-instance concurrency is handled by SELECT FOR UPDATE SKIP LOCKED.
 	 */
-	@Scheduled(fixedDelay = 500)
-	@Transactional
+	@Scheduled(fixedDelayString = "${outbox.poller.fixed-delay-ms:500}")
 	public void pollAndPublish() {
 		List<OutboxMessage> messages = outboxRepository.findPendingMessages(BATCH_SIZE);
-
 		if (messages.isEmpty()) return;
 
-		log.debug("Processing {} outbox messages", messages.size());
-
+		log.debug("Outbox poll: {} pending messages to publish", messages.size());
 		for (OutboxMessage message : messages) {
-			processMessage(message);
+			publishOne(message);
 		}
 	}
 
-	private void processMessage(OutboxMessage message) {
-		String topic = resolveTopic(message.getEventType());
+	/**
+	 * Each message in its own REQUIRES_NEW transaction:
+	 * - SELECT FOR UPDATE lock is released immediately after this method returns
+	 * - A Kafka failure for one message does not roll back others
+	 * - markSent/markFailed is committed atomically with the lock release
+	 */
+	@Transactional
+	public void publishOne(OutboxMessage message) {
+		// Derive Kafka topic from event type: "payment.completed" → "fincore.payments.payment-completed"
+		String topic = "fincore.payments." + message.getEventType().replace(".", "-");
 
 		try {
-			// sendSync() blocks until broker ACKs — guarantees the message
-			// is durable before we mark it SENT in the same transaction.
-			kafkaTemplate.send(topic, message.getAggregateId(), message.getPayload())
-					.get(); // blocks for broker ack
+			// Synchronous: .get() blocks until broker writes to ISR and ACKs.
+			// acks=all in producer config ensures all in-sync replicas have the message.
+			kafkaTemplate.send(topic, message.getAggregateId(), message.getPayload()).get();
 
 			message.markSent();
 			outboxRepository.markSent(message);
 
-			meterRegistry.counter("outbox.published.total",
+			meterRegistry.counter("outbox.publish.success",
 					"eventType", message.getEventType()).increment();
-
-			log.debug("Outbox published: {} → {} (aggregateId: {})",
-					message.getEventType(), topic, message.getAggregateId());
+			log.debug("Published outbox {} → topic: {}", message.getId(), topic);
 
 		} catch (Exception ex) {
-			log.error("Outbox publish failed for message {} (retry {}): {}",
-					message.getId(), message.getRetryCount(), ex.getMessage());
-
 			message.markFailed();
 			outboxRepository.markFailed(message);
 
 			if (message.isDeadLetter()) {
-				log.error("DEAD LETTER — message {} exhausted retries. eventType={}, aggregateId={}",
+				log.error("DEAD LETTER: outbox message {} exhausted all retries — eventType={}, aggregateId={}",
 						message.getId(), message.getEventType(), message.getAggregateId());
 				meterRegistry.counter("outbox.dead_letter.total",
 						"eventType", message.getEventType()).increment();
 			} else {
-				meterRegistry.counter("outbox.failed.total",
+				log.warn("Outbox publish failed (attempt {}): message={} error={}",
+						message.getRetryCount(), message.getId(), ex.getMessage());
+				meterRegistry.counter("outbox.publish.failed",
 						"eventType", message.getEventType()).increment();
 			}
 		}
-	}
-
-	/**
-	 * Maps domain event type to Kafka topic name.
-	 * <p>
-	 * Convention: eventType uses dots (payment.completed),
-	 * topic uses hyphens (payment-completed) under fincore.payments. prefix.
-	 */
-	private String resolveTopic(String eventType) {
-		// payment.initiated       → fincore.payments.payment-initiated
-		// payment.completed       → fincore.payments.payment-completed
-		// payment.failed          → fincore.payments.payment-failed
-		// payment.fraud.rejected  → fincore.payments.payment-fraud-rejected
-		// payment.cancelled       → fincore.payments.payment-cancelled
-		String suffix = eventType.replace(".", "-");
-		return TOPIC_PREFIX + suffix;
 	}
 }

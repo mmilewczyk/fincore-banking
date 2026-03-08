@@ -1,0 +1,41 @@
+{
+  "type": "record",
+  "name": "AccountFrozenEvent",
+  "namespace": "com.matcodem.fincore.account.avro",
+  "doc": "Published when account is frozen (fraud confirmed). Consumed by Notification Service and Compliance Dashboard.",
+  "fields": [
+    {
+      "name": "eventId",
+      "type": "string"
+    },
+    {
+      "name": "occurredAt",
+      "type": {
+        "type": "long",
+        "logicalType": "timestamp-millis"
+      }
+    },
+    {
+      "name": "accountId",
+      "type": "string"
+    },
+    {
+      "name": "reason",
+      "type": "string"
+    },
+    {
+      "name": "frozenBy",
+      "type": [
+        "null",
+        "string"
+      ],
+      "default": null,
+      "doc": "userId who triggered the freeze. Null for automated fraud-triggered freezes."
+    },
+    {
+      "name": "schemaVersion",
+      "type": "int",
+      "default": 1
+    }
+  ]
+}

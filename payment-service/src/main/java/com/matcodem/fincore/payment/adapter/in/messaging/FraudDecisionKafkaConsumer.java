@@ -1,37 +1,43 @@
 package com.matcodem.fincore.payment.adapter.in.messaging;
 
 
-import java.util.Map;
-
+import com.matcodem.fincore.fraud.avro.FraudCaseApprovedEvent;
+import com.matcodem.fincore.fraud.avro.FraudCaseBlockedEvent;
+import com.matcodem.fincore.fraud.avro.FraudCaseEscalatedEvent;
+import com.matcodem.fincore.fraud.avro.FraudConfirmedEvent;
+import com.matcodem.fincore.payment.domain.port.in.ProcessPaymentUseCase;
+import com.matcodem.fincore.payment.infrastructure.idempotency.IdempotencyGuard;
+import com.matcodem.fincore.payment.infrastructure.messaging.avro.AvroEventMapper;
+import io.micrometer.core.instrument.MeterRegistry;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.kafka.support.Acknowledgment;
 import org.springframework.stereotype.Component;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.matcodem.fincore.payment.infrastructure.idempotency.IdempotencyGuard;
-import com.matcodem.fincore.payment.domain.port.in.ProcessPaymentUseCase;
-
-import io.micrometer.core.instrument.MeterRegistry;
-import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
-
 /**
- * Listens to fraud.case.* events and drives payment lifecycle accordingly.
- * <p>
+ * Listens to fraud.case.* events and drives the payment lifecycle accordingly.
+ *
+ * AVRO DESERIALIZATION:
+ *   KafkaAvroDeserializer (configured in KafkaConsumerConfig) reads the Confluent wire format:
+ *     [magic byte 0x00][schema-id 4 bytes][avro payload]
+ *   It fetches the writer schema by ID from Schema Registry, applies BACKWARD compatibility
+ *   conversion to the reader schema (generated class), and returns a typed SpecificRecord.
+ *
+ *   The @KafkaListener receives ConsumerRecord<String, Object> because the deserializer
+ *   returns SpecificRecord subtypes. We cast to the expected type per topic.
+ *   If the wrong type arrives on a topic, ClassCastException routes the message to DLT
+ *   via DefaultErrorHandler — no data loss.
+ *
  * IDEMPOTENCY:
- * Every handler calls idempotencyGuard.tryProcess(eventId, ...) FIRST.
- * If Kafka redelivers the same event (broker retry, consumer restart):
- * → tryProcess returns false → we ACK immediately and return.
- * → No double-debit, no double-credit, no double-reject.
- * <p>
- * eventId extracted from payload; fallback to topic+partition+offset.
- * <p>
- * FLOW:
- * fraud.case.approved  → processPayment()           → debit + credit → COMPLETED
- * fraud.case.blocked   → rejectForFraud()            → REJECTED_FRAUD, no money moves
- * fraud.case.escalated → no-op                       → payment stays PENDING
- * fraud.confirmed      → initiateReversalIfNeeded()  → reverse if COMPLETED
+ *   eventId is now a typed String from the Avro record — no JSON parsing, no null risk.
+ *   Fallback to topic+partition+offset is retained for defense in depth.
+ *
+ * BACKWARD COMPATIBILITY:
+ *   If Fraud Service adds a field to FraudCaseBlockedEvent (e.g. ruleScores map),
+ *   old payment-service instances still work — KafkaAvroDeserializer fills new fields
+ *   with their default values from the .avsc. No redeployment required.
  */
 @Slf4j
 @Component
@@ -42,7 +48,7 @@ public class FraudDecisionKafkaConsumer {
 
 	private final ProcessPaymentUseCase processPaymentUseCase;
 	private final IdempotencyGuard idempotencyGuard;
-	private final ObjectMapper objectMapper;
+	private final AvroEventMapper avroEventMapper;
 	private final MeterRegistry meterRegistry;
 
 	@KafkaListener(
@@ -50,18 +56,20 @@ public class FraudDecisionKafkaConsumer {
 			groupId = GROUP_ID,
 			containerFactory = "paymentKafkaListenerContainerFactory"
 	)
-	public void onFraudApproved(ConsumerRecord<String, String> record, Acknowledgment ack) {
-		String paymentId = record.key();
-		try {
-			Map<String, Object> event = deserialize(record.value());
-			String eventId = extractEventId(event, record);
+	public void onFraudApproved(ConsumerRecord<String, Object> record, Acknowledgment ack) {
+		FraudCaseApprovedEvent event = (FraudCaseApprovedEvent) record.value();
+		String paymentId = avroEventMapper.extractPaymentId(event);
+		String eventId = extractEventId(event.getEventId(), record);
 
+		try {
 			if (!idempotencyGuard.tryProcess(eventId, "fraud.case.approved", GROUP_ID)) {
 				ack.acknowledge();
 				return;
 			}
 
-			log.info("Fraud APPROVED for payment {} — proceeding", paymentId);
+			log.info("Fraud APPROVED: paymentId={}, fraudScore={}, rulesEvaluated={}",
+					paymentId, event.getFraudScore(), event.getRulesEvaluated());
+
 			processPaymentUseCase.processPayment(paymentId);
 			meterRegistry.counter("payment.fraud.approved.processed").increment();
 			ack.acknowledge();
@@ -78,19 +86,21 @@ public class FraudDecisionKafkaConsumer {
 			groupId = GROUP_ID,
 			containerFactory = "paymentKafkaListenerContainerFactory"
 	)
-	public void onFraudBlocked(ConsumerRecord<String, String> record, Acknowledgment ack) {
-		String paymentId = record.key();
-		try {
-			Map<String, Object> event = deserialize(record.value());
-			String eventId = extractEventId(event, record);
+	public void onFraudBlocked(ConsumerRecord<String, Object> record, Acknowledgment ack) {
+		FraudCaseBlockedEvent event = (FraudCaseBlockedEvent) record.value();
+		String paymentId = avroEventMapper.extractPaymentId(event);
+		String eventId = extractEventId(event.getEventId(), record);
 
+		try {
 			if (!idempotencyGuard.tryProcess(eventId, "fraud.case.blocked", GROUP_ID)) {
 				ack.acknowledge();
 				return;
 			}
 
-			String reason = (String) event.getOrDefault("reason", "Blocked by fraud detection");
-			log.warn("Fraud BLOCKED payment {} — reason: {}", paymentId, reason);
+			String reason = avroEventMapper.extractReason(event);
+			log.warn("Fraud BLOCKED: paymentId={}, score={}, rule={}, reason={}",
+					paymentId, event.getFraudScore(), event.getTriggeringRule(), event.getReason());
+
 			processPaymentUseCase.rejectForFraud(paymentId, reason);
 			meterRegistry.counter("payment.fraud.blocked").increment();
 			ack.acknowledge();
@@ -106,18 +116,21 @@ public class FraudDecisionKafkaConsumer {
 			groupId = GROUP_ID,
 			containerFactory = "paymentKafkaListenerContainerFactory"
 	)
-	public void onFraudEscalated(ConsumerRecord<String, String> record, Acknowledgment ack) {
-		String paymentId = record.key();
-		try {
-			Map<String, Object> event = deserialize(record.value());
-			String eventId = extractEventId(event, record);
+	public void onFraudEscalated(ConsumerRecord<String, Object> record, Acknowledgment ack) {
+		FraudCaseEscalatedEvent event = (FraudCaseEscalatedEvent) record.value();
+		String paymentId = avroEventMapper.extractPaymentId(event);
+		String eventId = extractEventId(event.getEventId(), record);
 
+		try {
 			if (!idempotencyGuard.tryProcess(eventId, "fraud.case.escalated", GROUP_ID)) {
 				ack.acknowledge();
 				return;
 			}
 
-			log.info("Fraud ESCALATED for payment {} — awaiting compliance review", paymentId);
+			// Payment stays PENDING — awaiting manual compliance review
+			log.info("Fraud ESCALATED: paymentId={}, score={}, reason={}",
+					paymentId, event.getFraudScore(), event.getEscalationReason());
+
 			meterRegistry.counter("payment.fraud.escalated").increment();
 			ack.acknowledge();
 
@@ -132,20 +145,27 @@ public class FraudDecisionKafkaConsumer {
 			groupId = GROUP_ID,
 			containerFactory = "paymentKafkaListenerContainerFactory"
 	)
-	public void onFraudConfirmed(ConsumerRecord<String, String> record, Acknowledgment ack) {
-		String paymentId = record.key();
-		try {
-			Map<String, Object> event = deserialize(record.value());
-			String eventId = extractEventId(event, record);
+	public void onFraudConfirmed(ConsumerRecord<String, Object> record, Acknowledgment ack) {
+		FraudConfirmedEvent event = (FraudConfirmedEvent) record.value();
+		String paymentId = avroEventMapper.extractPaymentId(event);
+		String eventId = extractEventId(event.getEventId(), record);
 
+		try {
 			if (!idempotencyGuard.tryProcess(eventId, "fraud.confirmed", GROUP_ID)) {
 				ack.acknowledge();
 				return;
 			}
 
-			log.error("FRAUD CONFIRMED for payment {} — initiating reversal if needed", paymentId);
-			processPaymentUseCase.initiateReversalIfNeeded(paymentId,
-					(String) event.getOrDefault("notes", "Confirmed fraud"));
+			log.error("FRAUD CONFIRMED: paymentId={}, confirmedBy={}, reversalRequired={}",
+					paymentId, event.getConfirmedBy(), event.getReversalRequired());
+
+			if (avroEventMapper.isReversalRequired(event)) {
+				processPaymentUseCase.initiateReversalIfNeeded(paymentId,
+						avroEventMapper.extractNotes(event));
+			} else {
+				log.info("Reversal skipped for payment {} — already handled externally", paymentId);
+			}
+
 			meterRegistry.counter("payment.fraud.confirmed.reversal").increment();
 			ack.acknowledge();
 
@@ -155,15 +175,9 @@ public class FraudDecisionKafkaConsumer {
 		}
 	}
 
-	private String extractEventId(Map<String, Object> event, ConsumerRecord<?, ?> record) {
-		Object id = event.get("eventId");
-		if (id != null && !id.toString().isBlank()) return id.toString();
+	private String extractEventId(String avroEventId, ConsumerRecord<?, ?> record) {
+		if (avroEventId != null && !avroEventId.isBlank()) return avroEventId;
 		// Deterministic fallback: unique within topic+partition
 		return "%s-%d-%d".formatted(record.topic(), record.partition(), record.offset());
-	}
-
-	@SuppressWarnings("unchecked")
-	private Map<String, Object> deserialize(String json) throws Exception {
-		return objectMapper.readValue(json, Map.class);
 	}
 }

@@ -1,0 +1,49 @@
+{
+  "type": "record",
+  "name": "FraudCaseEscalatedEvent",
+  "namespace": "com.matcodem.fincore.fraud.avro",
+  "doc": "Published when a fraud case is escalated for manual review. Payment stays PENDING. Consumed by Payment Service (no-op — just acks) and Compliance Dashboard.",
+  "fields": [
+    {
+      "name": "eventId",
+      "type": "string"
+    },
+    {
+      "name": "occurredAt",
+      "type": {
+        "type": "long",
+        "logicalType": "timestamp-millis"
+      }
+    },
+    {
+      "name": "fraudCaseId",
+      "type": "string"
+    },
+    {
+      "name": "paymentId",
+      "type": "string"
+    },
+    {
+      "name": "fraudScore",
+      "type": "int"
+    },
+    {
+      "name": "escalationReason",
+      "type": "string"
+    },
+    {
+      "name": "assignedAnalyst",
+      "type": [
+        "null",
+        "string"
+      ],
+      "default": null,
+      "doc": "Analyst userId if already assigned, null if in queue"
+    },
+    {
+      "name": "schemaVersion",
+      "type": "int",
+      "default": 1
+    }
+  ]
+}

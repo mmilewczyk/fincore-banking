@@ -10,21 +10,61 @@
 		<version>1.0-SNAPSHOT</version>
 	</parent>
 
-	<groupId>com.fincore</groupId>
 	<artifactId>payment-service</artifactId>
 	<version>1.0.0-SNAPSHOT</version>
-	<description>Payment Service - distributed lock, idempotency, outbox pattern</description>
+	<description>Payment Service - distributed lock, idempotency, outbox pattern, Avro/Schema Registry
+	</description>
 
 	<properties>
 		<java.version>21</java.version>
-		<mapstruct.version>1.5.5.Final</mapstruct.version>
 		<testcontainers.version>1.19.7</testcontainers.version>
-		<redisson.version>4.3.0</redisson.version>
-		<resilience4j.version>2.3.0</resilience4j.version>
+		<redisson.version>3.27.2</redisson.version>
+		<resilience4j.version>2.2.0</resilience4j.version>
+		<wiremock.version>3.4.2</wiremock.version>
+
+		<!--
+			Avro + Confluent versions must match across all services.
+			Defined here; other services should use a parent POM or property file
+			to keep these in sync. Mismatched versions are the #1 cause of
+			"magic byte" deserialization errors at runtime.
+		-->
+		<avro.version>1.11.3</avro.version>
+		<!--
+			Confluent Platform 7.6.x ships kafka-avro-serializer 7.6.x.
+			Must match the Schema Registry version in docker-compose / K8s.
+			confluent-version IS NOT the same as cp-kafka image tag.
+		-->
+		<confluent.version>7.6.0</confluent.version>
 	</properties>
 
+	<!--
+		Confluent packages are NOT on Maven Central.
+		They live on Confluent's own repository.
+		Without this, maven will fail to resolve kafka-avro-serializer.
+	-->
+	<repositories>
+		<repository>
+			<id>confluent</id>
+			<name>Confluent Platform</name>
+			<url>https://packages.confluent.io/maven/</url>
+			<releases>
+				<enabled>true</enabled>
+			</releases>
+			<snapshots>
+				<enabled>false</enabled>
+			</snapshots>
+		</repository>
+	</repositories>
+
+	<pluginRepositories>
+		<pluginRepository>
+			<id>confluent</id>
+			<url>https://packages.confluent.io/maven/</url>
+		</pluginRepository>
+	</pluginRepositories>
+
 	<dependencies>
-		<!-- Spring Boot -->
+		<!-- Spring Boot core -->
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-web</artifactId>
@@ -50,10 +90,54 @@
 			<artifactId>spring-boot-starter-oauth2-resource-server</artifactId>
 		</dependency>
 
+		<!--
+			WebFlux — needed for WebClient (AccountServiceWebClient, FxServiceWebClient).
+			Coexists with spring-boot-starter-web: Boot keeps Tomcat as the server,
+			WebClient is used only as a reactive HTTP client in blocking mode (.block()).
+		-->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-webflux</artifactId>
+		</dependency>
+
 		<!-- Kafka -->
 		<dependency>
 			<groupId>org.springframework.kafka</groupId>
 			<artifactId>spring-kafka</artifactId>
+		</dependency>
+
+		<!-- ─── Avro + Schema Registry ─────────────────────────────────────────
+			 kafka-avro-serializer bundles:
+			   - avro (org.apache.avro)
+			   - confluent schema-registry-client
+			   - KafkaAvroSerializer / KafkaAvroDeserializer
+			 Do NOT add org.apache.avro:avro separately — version conflicts.
+		-->
+		<dependency>
+			<groupId>io.confluent</groupId>
+			<artifactId>kafka-avro-serializer</artifactId>
+			<version>${confluent.version}</version>
+			<!--
+				Exclude kafka-clients to prevent version conflict with spring-kafka.
+				Spring Kafka manages kafka-clients version via spring-boot-starter-parent.
+			-->
+			<exclusions>
+				<exclusion>
+					<groupId>org.apache.kafka</groupId>
+					<artifactId>kafka-clients</artifactId>
+				</exclusion>
+			</exclusions>
+		</dependency>
+
+		<!--
+			avro-maven-plugin generates Java classes from .avsc at compile time.
+			The runtime dependency on avro is already pulled in by kafka-avro-serializer,
+			but we need this for the generated SpecificRecord classes at compile time.
+		-->
+		<dependency>
+			<groupId>org.apache.avro</groupId>
+			<artifactId>avro</artifactId>
+			<version>${avro.version}</version>
 		</dependency>
 
 		<!-- Redisson — distributed lock with watchdog -->
@@ -61,10 +145,9 @@
 			<groupId>org.redisson</groupId>
 			<artifactId>redisson-spring-boot-starter</artifactId>
 			<version>${redisson.version}</version>
-			<scope>compile</scope>
 		</dependency>
 
-		<!-- Resilience4j — circuit breaker, retry, bulkhead -->
+		<!-- Resilience4j -->
 		<dependency>
 			<groupId>io.github.resilience4j</groupId>
 			<artifactId>resilience4j-spring-boot3</artifactId>
@@ -101,12 +184,7 @@
 			<artifactId>opentelemetry-exporter-otlp</artifactId>
 		</dependency>
 
-		<!-- Utilities -->
-		<dependency>
-			<groupId>org.mapstruct</groupId>
-			<artifactId>mapstruct</artifactId>
-			<version>${mapstruct.version}</version>
-		</dependency>
+		<!-- Lombok -->
 		<dependency>
 			<groupId>org.projectlombok</groupId>
 			<artifactId>lombok</artifactId>
@@ -114,7 +192,7 @@
 			<scope>provided</scope>
 		</dependency>
 
-		<!-- Testing -->
+		<!-- ─── Test dependencies ──────────────────────────────────────────── -->
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-test</artifactId>
@@ -148,15 +226,26 @@
 			<version>${testcontainers.version}</version>
 			<scope>test</scope>
 		</dependency>
+		<!--
+			WireMock 3.x — Java 21 compatible.
+			Replaces com.github.tomakehurst:wiremock-jre8-standalone 2.x.
+		-->
 		<dependency>
-			<groupId>com.github.tomakehurst</groupId>
-			<artifactId>wiremock-jre8-standalone</artifactId>
-			<version>2.35.2</version>
+			<groupId>org.wiremock</groupId>
+			<artifactId>wiremock-standalone</artifactId>
+			<version>${wiremock.version}</version>
 			<scope>test</scope>
 		</dependency>
+		<!--
+			Testcontainers Schema Registry module.
+			Spins up a real confluentinc/cp-schema-registry container in integration tests.
+			Avoids mocking the registry — tests validate real schema registration/compatibility.
+		-->
 		<dependency>
-			<groupId>org.springframework</groupId>
-			<artifactId>spring-webflux</artifactId>
+			<groupId>io.confluent</groupId>
+			<artifactId>kafka-schema-registry-client</artifactId>
+			<version>${confluent.version}</version>
+			<scope>test</scope>
 		</dependency>
 	</dependencies>
 
@@ -174,6 +263,7 @@
 					</excludes>
 				</configuration>
 			</plugin>
+
 			<plugin>
 				<groupId>org.apache.maven.plugins</groupId>
 				<artifactId>maven-compiler-plugin</artifactId>
@@ -184,13 +274,82 @@
 							<artifactId>lombok</artifactId>
 							<version>1.18.30</version>
 						</path>
-						<path>
-							<groupId>org.mapstruct</groupId>
-							<artifactId>mapstruct-processor</artifactId>
-							<version>${mapstruct.version}</version>
-						</path>
 					</annotationProcessorPaths>
 				</configuration>
+			</plugin>
+
+			<!--
+				avro-maven-plugin — generates Java SpecificRecord classes from .avsc files.
+
+				Execution order: generate-sources phase runs BEFORE compile.
+				Generated classes land in target/generated-sources/avro/ and are
+				automatically added to the compile source root by the plugin.
+
+				stringType=String: use java.lang.String instead of CharSequence
+				(CharSequence causes subtle bugs with equals/hashCode and JSON serialization).
+
+				enableDecimalLogicalType=true: map Avro decimal logical type to
+				java.math.BigDecimal instead of byte[]. Critical for amount fields.
+			-->
+			<plugin>
+				<groupId>org.apache.avro</groupId>
+				<artifactId>avro-maven-plugin</artifactId>
+				<version>${avro.version}</version>
+				<executions>
+					<execution>
+						<id>generate-payment-avro</id>
+						<phase>generate-sources</phase>
+						<goals>
+							<goal>schema</goal>
+						</goals>
+						<configuration>
+							<sourceDirectory>${project.basedir}/src/main/avro</sourceDirectory>
+							<outputDirectory>${project.build.directory}/generated-sources/avro</outputDirectory>
+							<imports>
+								<import>${project.basedir}/src/main/avro/Currency.avsc</import>
+							</imports>
+							<stringType>String</stringType>
+							<enableDecimalLogicalType>true</enableDecimalLogicalType>
+							<!--
+								fieldVisibility=PRIVATE + createSetters=false:
+								Generated classes have private fields and only getters.
+								Builder pattern is still available (Avro always generates it).
+								This prevents accidental mutation — treat records as value objects.
+							-->
+							<fieldVisibility>PRIVATE</fieldVisibility>
+							<createSetters>false</createSetters>
+						</configuration>
+					</execution>
+				</executions>
+			</plugin>
+
+			<!-- Unit tests only (fast) -->
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-surefire-plugin</artifactId>
+				<configuration>
+					<excludedGroups>integration</excludedGroups>
+				</configuration>
+			</plugin>
+
+			<!-- Integration tests with Testcontainers (mvn verify) -->
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-failsafe-plugin</artifactId>
+				<configuration>
+					<groups>integration</groups>
+					<includes>
+						<include>**/*IntegrationTest.java</include>
+					</includes>
+				</configuration>
+				<executions>
+					<execution>
+						<goals>
+							<goal>integration-test</goal>
+							<goal>verify</goal>
+						</goals>
+					</execution>
+				</executions>
 			</plugin>
 		</plugins>
 	</build>

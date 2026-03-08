@@ -13,8 +13,15 @@ public record PaymentId(UUID value) {
 		return new PaymentId(UUID.randomUUID());
 	}
 
+	/**
+	 * Accepts UUID string or plain UUID — used from web layer and Kafka consumers.
+	 */
 	public static PaymentId of(String value) {
-		return new PaymentId(UUID.fromString(value));
+		try {
+			return new PaymentId(UUID.fromString(value));
+		} catch (IllegalArgumentException ex) {
+			throw new IllegalArgumentException("Invalid PaymentId format: '" + value + "'", ex);
+		}
 	}
 
 	public static PaymentId of(UUID value) {

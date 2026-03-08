@@ -1,0 +1,12 @@
+{
+  "type": "enum",
+  "name": "Currency",
+  "namespace": "com.matcodem.fincore.payment.avro",
+  "doc": "ISO currency code used by payments.",
+  "symbols": [
+    "PLN",
+    "EUR",
+    "USD",
+    "GBP"
+  ]
+}

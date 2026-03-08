@@ -1,0 +1,130 @@
+package com.matcodem.fincore.payment.application.processor;
+
+import java.util.List;
+import java.util.NoSuchElementException;
+
+import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
+
+import com.matcodem.fincore.payment.adapter.out.client.AccountServiceWebClient;
+import com.matcodem.fincore.payment.adapter.out.client.FxServiceWebClient;
+import com.matcodem.fincore.payment.domain.event.DomainEvent;
+import com.matcodem.fincore.payment.domain.model.Money;
+import com.matcodem.fincore.payment.domain.model.Payment;
+import com.matcodem.fincore.payment.domain.model.PaymentId;
+import com.matcodem.fincore.payment.domain.model.PaymentType;
+import com.matcodem.fincore.payment.domain.port.out.AccountServiceClient;
+import com.matcodem.fincore.payment.domain.port.out.OutboxEventPublisher;
+import com.matcodem.fincore.payment.domain.port.out.PaymentRepository;
+
+import io.micrometer.core.instrument.MeterRegistry;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+
+@Slf4j
+@Component
+@RequiredArgsConstructor
+public class PaymentProcessor {
+
+	private final PaymentRepository paymentRepository;
+	private final AccountServiceClient accountServiceClient;
+	private final OutboxEventPublisher outboxEventPublisher;
+	private final FxServiceWebClient fxServiceClient;
+	private final MeterRegistry meterRegistry;
+
+	/**
+	 * Called while the distributed lock is held.
+	 * Opens its own @Transactional scope — the lock is acquired BEFORE the
+	 * transaction opens, so the DB connection is not held during lock wait.
+	 */
+	@Transactional
+	public void executeUnderLock(String paymentId) {
+		// Re-fetch with fresh snapshot — mandatory to avoid acting on stale state
+		// from before the lock was acquired (another instance may have raced us).
+		Payment payment = loadPayment(paymentId);
+		if (!payment.isPending()) {
+			log.warn("Payment {} already claimed ({}) — skipping under lock",
+					paymentId, payment.getStatus());
+			return;
+		}
+
+		payment.startProcessing();
+		// Persist PROCESSING status immediately so other pods see it even if we crash
+		// mid-flight. On recovery, the payment stays PROCESSING until a human or
+		// compensation job resolves it.
+		paymentRepository.save(payment);
+
+		try {
+			if (payment.getType() == PaymentType.FX_CONVERSION) {
+				performFxConversion(payment);
+			}
+
+			accountServiceClient.debitAccount(
+					payment.getSourceAccountId(), payment.getAmount(), paymentId);
+
+			accountServiceClient.creditAccount(
+					payment.getTargetAccountId(), payment.getAmount(), paymentId);
+
+			payment.complete();
+			saveAndPublish(payment);
+
+			meterRegistry.counter("payment.completed", "type", payment.getType().name()).increment();
+			log.info("Payment {} COMPLETED successfully", paymentId);
+
+		} catch (FxServiceWebClient.FxServiceUnavailableException ex) {
+			// FX failed before any money moved — clean failure, no compensation needed
+			log.error("FX conversion failed for payment {}: {}", paymentId, ex.getMessage());
+			payment.fail("FX conversion unavailable: " + ex.getMessage());
+			saveAndPublish(payment);
+			meterRegistry.counter("payment.failed", "reason", "fx_service").increment();
+
+		} catch (AccountServiceWebClient.AccountServiceUnavailableException ex) {
+			// Debit OR credit failed. If debit succeeded and credit failed,
+			// money has moved — see class Javadoc for compensation strategy.
+			log.error("ACCOUNT SERVICE FAILED for payment {} — possible partial execution: {}",
+					paymentId, ex.getMessage());
+			payment.fail("Account Service unavailable: " + ex.getMessage());
+			saveAndPublish(payment);
+			meterRegistry.counter("payment.failed", "reason", "account_service").increment();
+		}
+	}
+
+	private Payment loadPayment(String paymentId) {
+		return paymentRepository.findById(PaymentId.of(paymentId))
+				.orElseThrow(() -> new NoSuchElementException("Payment not found: " + paymentId));
+	}
+
+	private void performFxConversion(Payment payment) {
+		String paymentId = payment.getId().toString();
+		Money money = payment.getAmount();
+		String pair = money.getCurrency().getCode() + "PLN";
+
+		FxServiceWebClient.FxConversionResult fx = fxServiceClient.convert(
+				paymentId,
+				payment.getSourceAccountId(),
+				payment.getInitiatedBy(),
+				pair,
+				money.getAmount(),
+				"BUY_BASE"
+		);
+		log.info("FX locked for payment {} — {} {} → {} PLN @ {} (fee: {}, convId: {})",
+				paymentId, money.getAmount(), money.getCurrency().getCode(),
+				fx.convertedAmount(), fx.appliedRate(), fx.fee(), fx.conversionId());
+	}
+
+	/**
+	 * Persist the payment and flush all accumulated domain events to the outbox.
+	 * Called within an active @Transactional context — payment row + outbox rows
+	 * are written atomically.
+	 * <p>
+	 * Note: pullDomainEvents() clears the in-memory list — idempotent, safe to call
+	 * multiple times (second call returns empty list).
+	 */
+	private void saveAndPublish(Payment payment) {
+		paymentRepository.save(payment);
+		List<DomainEvent> events = payment.pullDomainEvents();
+		events.forEach(event -> outboxEventPublisher.publish(event, "Payment"));
+		log.debug("Saved payment {} ({}) and queued {} domain event(s) to outbox",
+				payment.getId(), payment.getStatus(), events.size());
+	}
+}

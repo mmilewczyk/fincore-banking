@@ -1,41 +1,31 @@
 package com.matcodem.fincore.fraud.adapter.out.messaging;
 
 import java.util.List;
-import java.util.Map;
 
+import org.apache.avro.specific.SpecificRecord;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Component;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.matcodem.fincore.fraud.domain.event.DomainEvent;
 import com.matcodem.fincore.fraud.domain.event.FraudCaseApprovedEvent;
 import com.matcodem.fincore.fraud.domain.event.FraudCaseBlockedEvent;
 import com.matcodem.fincore.fraud.domain.event.FraudCaseEscalatedEvent;
 import com.matcodem.fincore.fraud.domain.event.FraudConfirmedEvent;
 import com.matcodem.fincore.fraud.domain.port.out.FraudEventPublisher;
+import com.matcodem.fincore.fraud.infrastructure.messaging.avro.AvroFraudEventMapper;
 
+import io.micrometer.core.instrument.MeterRegistry;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
-/**
- * Adapter — publishes fraud domain events to Kafka.
- * <p>
- * Topic routing:
- * FraudCaseApprovedEvent   → fincore.fraud.case-approved
- * FraudCaseBlockedEvent    → fincore.fraud.case-blocked     (Payment Service listens here)
- * FraudCaseEscalatedEvent  → fincore.fraud.case-escalated
- * FraudConfirmedEvent      → fincore.fraud.confirmed        (Account Service listens to freeze)
- * <p>
- * Key = paymentId — ensures events for the same payment land on the same partition,
- * preserving ordering guarantees within a payment's lifecycle.
- */
 @Slf4j
 @Component
 @RequiredArgsConstructor
 public class KafkaFraudEventPublisher implements FraudEventPublisher {
 
-	private final KafkaTemplate<String, String> kafkaTemplate;
-	private final ObjectMapper objectMapper;
+	private final KafkaTemplate<String, Object> avroKafkaTemplate;
+	private final AvroFraudEventMapper avroFraudEventMapper;
+	private final MeterRegistry meterRegistry;
 
 	private static final String TOPIC_PREFIX = "fincore.fraud.";
 
@@ -45,33 +35,33 @@ public class KafkaFraudEventPublisher implements FraudEventPublisher {
 	}
 
 	private void publish(DomainEvent event) {
-		String topic = TOPIC_PREFIX + event.eventType().replace("fraud.", "").replace(".", "-");
+		SpecificRecord avroRecord = avroFraudEventMapper.toAvro(event);
+		String topic = resolveTopic(event);
 		String key = resolveKey(event);
 
-		try {
-			String payload = objectMapper.writeValueAsString(toPayload(event));
-
-			kafkaTemplate.send(topic, key, payload)
-					.whenComplete((result, ex) -> {
-						if (ex != null) {
-							log.error("Failed to publish fraud event {} to {}: {}",
-									event.eventType(), topic, ex.getMessage());
-						} else {
-							log.debug("Published fraud event {} → {} (offset: {})",
-									event.eventType(), topic,
-									result.getRecordMetadata().offset());
-						}
-					});
-		} catch (Exception ex) {
-			// Serialization failure is a programming error — fail fast
-			throw new RuntimeException("Failed to serialize fraud event: " + event.eventType(), ex);
-		}
+		avroKafkaTemplate.send(topic, key, avroRecord)
+				.whenComplete((result, ex) -> {
+					if (ex != null) {
+						log.error("Failed to publish Avro fraud event {} to {}: {}",
+								event.eventType(), topic, ex.getMessage());
+						meterRegistry.counter("fraud.publisher.error",
+								"eventType", event.eventType()).increment();
+					} else {
+						log.debug("Published Avro fraud event {} → {} offset={}",
+								event.eventType(), topic,
+								result.getRecordMetadata().offset());
+						meterRegistry.counter("fraud.publisher.success",
+								"eventType", event.eventType()).increment();
+					}
+				});
 	}
 
-	/**
-	 * Use paymentId as the Kafka key so all events for a payment
-	 * go to the same partition and are consumed in order.
-	 */
+	private String resolveTopic(DomainEvent event) {
+		// fraud.case.approved → fincore.fraud.case-approved
+		// fraud.confirmed     → fincore.fraud.confirmed
+		return TOPIC_PREFIX + event.eventType().replace("fraud.", "").replace(".", "-");
+	}
+
 	private String resolveKey(DomainEvent event) {
 		return switch (event) {
 			case FraudCaseApprovedEvent e -> e.paymentId();
@@ -79,55 +69,6 @@ public class KafkaFraudEventPublisher implements FraudEventPublisher {
 			case FraudCaseEscalatedEvent e -> e.paymentId();
 			case FraudConfirmedEvent e -> e.paymentId();
 			default -> event.aggregateId();
-		};
-	}
-
-	private Map<String, Object> toPayload(DomainEvent event) {
-		return switch (event) {
-			case FraudCaseApprovedEvent e -> Map.of(
-					"eventId", e.eventId(),
-					"eventType", e.eventType(),
-					"fraudCaseId", e.fraudCaseId().toString(),
-					"paymentId", e.paymentId(),
-					"riskScore", e.score().getValue(),
-					"riskLevel", e.score().getLevel().name(),
-					"occurredAt", e.occurredAt().toString()
-			);
-			case FraudCaseBlockedEvent e -> Map.of(
-					"eventId", e.eventId(),
-					"eventType", e.eventType(),
-					"fraudCaseId", e.fraudCaseId().toString(),
-					"paymentId", e.paymentId(),
-					"sourceAccountId", e.sourceAccountId(),
-					"riskScore", e.score().getValue(),
-					"riskLevel", e.score().getLevel().name(),
-					"reason", e.reason(),
-					"occurredAt", e.occurredAt().toString()
-			);
-			case FraudCaseEscalatedEvent e -> Map.of(
-					"eventId", e.eventId(),
-					"eventType", e.eventType(),
-					"fraudCaseId", e.fraudCaseId().toString(),
-					"paymentId", e.paymentId(),
-					"riskScore", e.score().getValue(),
-					"occurredAt", e.occurredAt().toString()
-			);
-			case FraudConfirmedEvent e -> Map.of(
-					"eventId", e.eventId(),
-					"eventType", e.eventType(),
-					"fraudCaseId", e.fraudCaseId().toString(),
-					"paymentId", e.paymentId(),
-					"sourceAccountId", e.sourceAccountId(),
-					"riskScore", e.score().getValue(),
-					"notes", e.notes(),
-					"occurredAt", e.occurredAt().toString()
-			);
-			default -> Map.of(
-					"eventId", event.eventId(),
-					"eventType", event.eventType(),
-					"aggregateId", event.aggregateId(),
-					"occurredAt", event.occurredAt().toString()
-			);
 		};
 	}
 }

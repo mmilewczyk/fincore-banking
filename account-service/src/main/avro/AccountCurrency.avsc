@@ -1,0 +1,13 @@
+{
+  "type": "enum",
+  "name": "AccountCurrency",
+  "namespace": "com.matcodem.fincore.account.avro",
+  "symbols": [
+    "PLN",
+    "EUR",
+    "USD",
+    "GBP",
+    "CHF",
+    "JPY"
+  ]
+}

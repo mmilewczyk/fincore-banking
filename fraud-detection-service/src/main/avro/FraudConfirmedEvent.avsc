@@ -1,0 +1,48 @@
+{
+  "type": "record",
+  "name": "FraudConfirmedEvent",
+  "namespace": "com.matcodem.fincore.fraud.avro",
+  "doc": "Published when compliance manually confirms fraud after post-completion review. Consumed by Payment Service to trigger reversal if payment is COMPLETED.",
+  "fields": [
+    {
+      "name": "eventId",
+      "type": "string"
+    },
+    {
+      "name": "occurredAt",
+      "type": {
+        "type": "long",
+        "logicalType": "timestamp-millis"
+      }
+    },
+    {
+      "name": "fraudCaseId",
+      "type": "string"
+    },
+    {
+      "name": "paymentId",
+      "type": "string"
+    },
+    {
+      "name": "confirmedBy",
+      "type": "string",
+      "doc": "Compliance analyst userId"
+    },
+    {
+      "name": "notes",
+      "type": "string",
+      "doc": "Compliance notes — stored for audit trail"
+    },
+    {
+      "name": "reversalRequired",
+      "type": "boolean",
+      "default": true,
+      "doc": "If false, reversal was already handled externally (e.g. chargeback). Payment Service should skip reversal."
+    },
+    {
+      "name": "schemaVersion",
+      "type": "int",
+      "default": 1
+    }
+  ]
+}

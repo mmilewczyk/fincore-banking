@@ -1,0 +1,56 @@
+{
+  "type": "record",
+  "name": "FraudCaseBlockedEvent",
+  "namespace": "com.matcodem.fincore.fraud.avro",
+  "doc": "Published by Fraud Detection Service when a payment is blocked by fraud rules. Consumed by Payment Service to mark payment REJECTED_FRAUD.",
+  "fields": [
+    {
+      "name": "eventId",
+      "type": "string"
+    },
+    {
+      "name": "occurredAt",
+      "type": {
+        "type": "long",
+        "logicalType": "timestamp-millis"
+      }
+    },
+    {
+      "name": "fraudCaseId",
+      "type": "string"
+    },
+    {
+      "name": "paymentId",
+      "type": "string"
+    },
+    {
+      "name": "fraudScore",
+      "type": "int",
+      "doc": "Score that exceeded the threshold"
+    },
+    {
+      "name": "triggeringRule",
+      "type": "string",
+      "doc": "Name of the rule that triggered the block, e.g. 'VelocityRule'"
+    },
+    {
+      "name": "reason",
+      "type": "string",
+      "doc": "Human-readable explanation"
+    },
+    {
+      "name": "ruleScores",
+      "type": {
+        "type": "map",
+        "values": "int"
+      },
+      "default": {},
+      "doc": "Score per rule, e.g. {VelocityRule: 85, AmountRule: 20}. Added in v2 — empty map in older messages (BACKWARD compatible)."
+    },
+    {
+      "name": "schemaVersion",
+      "type": "int",
+      "default": 1
+    }
+  ]
+}

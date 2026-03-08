@@ -1,0 +1,54 @@
+{
+  "type": "record",
+  "name": "AccountCreditedEvent",
+  "namespace": "com.matcodem.fincore.account.avro",
+  "doc": "Published when funds are credited. Consumed by Analytics, Notification Service.",
+  "fields": [
+    {
+      "name": "eventId",
+      "type": "string"
+    },
+    {
+      "name": "occurredAt",
+      "type": {
+        "type": "long",
+        "logicalType": "timestamp-millis"
+      }
+    },
+    {
+      "name": "accountId",
+      "type": "string"
+    },
+    {
+      "name": "amount",
+      "type": {
+        "type": "bytes",
+        "logicalType": "decimal",
+        "precision": 19,
+        "scale": 4
+      }
+    },
+    {
+      "name": "currency",
+      "type": "com.matcodem.fincore.account.avro.AccountCurrency"
+    },
+    {
+      "name": "balanceAfter",
+      "type": {
+        "type": "bytes",
+        "logicalType": "decimal",
+        "precision": 19,
+        "scale": 4
+      }
+    },
+    {
+      "name": "reference",
+      "type": "string"
+    },
+    {
+      "name": "schemaVersion",
+      "type": "int",
+      "default": 1
+    }
+  ]
+}

@@ -1,0 +1,53 @@
+{
+  "type": "record",
+  "name": "FraudCaseApprovedEvent",
+  "namespace": "com.matcodem.fincore.fraud.avro",
+  "doc": "Published by Fraud Detection Service when a payment passes all fraud checks. Consumed by Payment Service to proceed with debit/credit.",
+  "fields": [
+    {
+      "name": "eventId",
+      "type": "string"
+    },
+    {
+      "name": "occurredAt",
+      "type": {
+        "type": "long",
+        "logicalType": "timestamp-millis"
+      }
+    },
+    {
+      "name": "fraudCaseId",
+      "type": "string",
+      "doc": "UUID of the FraudCase aggregate in Fraud Detection Service"
+    },
+    {
+      "name": "paymentId",
+      "type": "string",
+      "doc": "UUID of the Payment aggregate in Payment Service"
+    },
+    {
+      "name": "fraudScore",
+      "type": "int",
+      "doc": "Final composite fraud score 0-100. Lower = less risky."
+    },
+    {
+      "name": "rulesEvaluated",
+      "type": "int",
+      "doc": "Number of fraud rules evaluated. Useful for debugging and audit."
+    },
+    {
+      "name": "reviewedBy",
+      "type": [
+        "null",
+        "string"
+      ],
+      "default": null,
+      "doc": "Analyst userId if this was manually reviewed, null if auto-approved"
+    },
+    {
+      "name": "schemaVersion",
+      "type": "int",
+      "default": 1
+    }
+  ]
+}
