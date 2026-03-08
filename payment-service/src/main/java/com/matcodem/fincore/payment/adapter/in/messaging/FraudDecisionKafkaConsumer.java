@@ -28,15 +28,15 @@ import org.springframework.stereotype.Component;
  *   The @KafkaListener receives ConsumerRecord<String, Object> because the deserializer
  *   returns SpecificRecord subtypes. We cast to the expected type per topic.
  *   If the wrong type arrives on a topic, ClassCastException routes the message to DLT
- *   via DefaultErrorHandler — no data loss.
+ *   via DefaultErrorHandler - no data loss.
  *
  * IDEMPOTENCY:
- *   eventId is now a typed String from the Avro record — no JSON parsing, no null risk.
+ *   eventId is now a typed String from the Avro record - no JSON parsing, no null risk.
  *   Fallback to topic+partition+offset is retained for defense in depth.
  *
  * BACKWARD COMPATIBILITY:
  *   If Fraud Service adds a field to FraudCaseBlockedEvent (e.g. ruleScores map),
- *   old payment-service instances still work — KafkaAvroDeserializer fills new fields
+ *   old payment-service instances still work - KafkaAvroDeserializer fills new fields
  *   with their default values from the .avsc. No redeployment required.
  */
 @Slf4j
@@ -127,7 +127,7 @@ public class FraudDecisionKafkaConsumer {
 				return;
 			}
 
-			// Payment stays PENDING — awaiting manual compliance review
+			// Payment stays PENDING - awaiting manual compliance review
 			log.info("Fraud ESCALATED: paymentId={}, score={}, reason={}",
 					paymentId, event.getFraudScore(), event.getEscalationReason());
 
@@ -163,7 +163,7 @@ public class FraudDecisionKafkaConsumer {
 				processPaymentUseCase.initiateReversalIfNeeded(paymentId,
 						avroEventMapper.extractNotes(event));
 			} else {
-				log.info("Reversal skipped for payment {} — already handled externally", paymentId);
+				log.info("Reversal skipped for payment {} - already handled externally", paymentId);
 			}
 
 			meterRegistry.counter("payment.fraud.confirmed.reversal").increment();

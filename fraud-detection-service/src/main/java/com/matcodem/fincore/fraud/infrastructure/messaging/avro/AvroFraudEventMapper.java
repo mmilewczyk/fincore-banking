@@ -29,7 +29,7 @@ public class AvroFraudEventMapper {
 
 	public SpecificRecord toAvro(DomainEvent event) {
 		return switch (event) {
-			case FraudCaseApprovedEvent e -> toAvro(e, 0);  // rulesEvaluated unknown here — see note
+			case FraudCaseApprovedEvent e -> toAvro(e, 0);  // rulesEvaluated unknown here - see note
 			case FraudCaseBlockedEvent e -> toAvro(e);
 			case FraudCaseEscalatedEvent e -> toAvro(e);
 			case FraudConfirmedEvent e -> toAvro(e);
@@ -39,7 +39,7 @@ public class AvroFraudEventMapper {
 	}
 
 	/**
-	 * Primary method for FraudCaseApprovedEvent — caller provides rulesEvaluated
+	 * Primary method for FraudCaseApprovedEvent - caller provides rulesEvaluated
 	 * from FraudCase aggregate (not available in the event itself).
 	 */
 	public com.matcodem.fincore.fraud.avro.FraudCaseApprovedEvent toAvro(FraudCaseApprovedEvent e,
@@ -77,7 +77,7 @@ public class AvroFraudEventMapper {
 				.setFraudCaseId(e.fraudCaseId().toString())
 				.setPaymentId(e.paymentId())
 				.setFraudScore(e.score().getValue())
-				.setEscalationReason("Score %d — %s".formatted(e.score().getValue(), e.score().getLevel().name()))
+				.setEscalationReason("Score %d - %s".formatted(e.score().getValue(), e.score().getLevel().name()))
 				.setAssignedAnalyst(null)
 				.setSchemaVersion(1)
 				.build();
@@ -89,7 +89,7 @@ public class AvroFraudEventMapper {
 				.setOccurredAt(e.occurredAt())
 				.setFraudCaseId(e.fraudCaseId().toString())
 				.setPaymentId(e.paymentId())
-				.setConfirmedBy(e.sourceAccountId()) // confirmedBy not in current domain event — see comment
+				.setConfirmedBy(e.sourceAccountId()) // confirmedBy not in current domain event - see comment
 				.setNotes(e.notes())
 				.setReversalRequired(true)
 				.setSchemaVersion(1)
@@ -98,7 +98,7 @@ public class AvroFraudEventMapper {
 
 	/**
 	 * Extracts rule name from reason string like "VelocityRule: score=85 (threshold=70)".
-	 * Returns "UNKNOWN" if format doesn't match — safe fallback, never throws.
+	 * Returns "UNKNOWN" if format doesn't match - safe fallback, never throws.
 	 */
 	private String extractTriggeringRule(String reason) {
 		if (reason == null) return "UNKNOWN";

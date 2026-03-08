@@ -22,7 +22,7 @@ import lombok.extern.slf4j.Slf4j;
  * Listens to account.credited and account.debited events published by Account Service.
  * Writes a denormalized row for each transaction into transaction_history table.
  * <p>
- * This is the CQRS pattern — this service owns its own read model,
+ * This is the CQRS pattern - this service owns its own read model,
  * optimized for fraud analytics queries (velocity, averages, history).
  * <p>
  * Idempotent: uses INSERT ... ON CONFLICT DO NOTHING (event_id as unique key).
@@ -58,7 +58,7 @@ public class TransactionHistoryProjector {
 			String reference = event.getOrDefault("reference", "").toString();
 			Instant occurredAt = Instant.parse(event.get("occurredAt").toString());
 
-			// Idempotent upsert — safe on Kafka re-delivery
+			// Idempotent upsert - safe on Kafka re-delivery
 			jdbcTemplate.update("""
 							INSERT INTO transaction_history
 							    (id, account_id, amount, currency, reference, occurred_at)
@@ -68,7 +68,7 @@ public class TransactionHistoryProjector {
 					UUID.fromString(eventId), accountId, amount, currency, reference, occurredAt
 			);
 
-			log.debug("Projected transaction {} for account {} — amount: {} {}",
+			log.debug("Projected transaction {} for account {} - amount: {} {}",
 					eventId, accountId, amount, currency);
 
 			acknowledgment.acknowledge();

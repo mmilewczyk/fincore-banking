@@ -17,7 +17,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
 /**
- * Read-only query service — CQRS query side for payments.
+ * Read-only query service - CQRS query side for payments.
  * <p>
  * All methods are @Transactional(readOnly=true):
  * - Signals intent to Hibernate (no dirty checking, no flush)

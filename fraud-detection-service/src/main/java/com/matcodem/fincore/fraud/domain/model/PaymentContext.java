@@ -5,7 +5,7 @@ import java.time.Instant;
 import java.util.Objects;
 
 /**
- * Value Object — immutable snapshot of a payment used for rule evaluation.
+ * Value Object - immutable snapshot of a payment used for rule evaluation.
  * <p>
  * Passed to every FraudRule. Contains everything a rule might need
  * to make a decision, including enriched context fetched from other services.
@@ -175,7 +175,7 @@ public final class PaymentContext {
 	}
 
 	/**
-	 * Enriched data about an account — fetched from Account Service.
+	 * Enriched data about an account - fetched from Account Service.
 	 */
 	public record AccountContext(
 			String accountId,
@@ -190,7 +190,7 @@ public final class PaymentContext {
 	}
 
 	/**
-	 * User behavioral pattern — computed from transaction history.
+	 * User behavioral pattern - computed from transaction history.
 	 */
 	public record UserBehaviorContext(
 			String userId,

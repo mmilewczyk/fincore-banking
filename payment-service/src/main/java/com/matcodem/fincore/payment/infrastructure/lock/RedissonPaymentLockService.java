@@ -20,21 +20,21 @@ import lombok.extern.slf4j.Slf4j;
  * <p>
  * Key design decisions:
  * <p>
- * 1. WATCHDOG — we use lockInterruptibly() WITHOUT leaseTime.
+ * 1. WATCHDOG - we use lockInterruptibly() WITHOUT leaseTime.
  * This activates Redisson's watchdog which auto-renews the lock every
  * lockWatchdogTimeout/3 seconds (default: every 10s for 30s TTL).
- * → No risk of lock expiring during long operations.
+ * -> No risk of lock expiring during long operations.
  * <p>
- * 2. ORDERED LOCKING — always acquire locks in alphabetical order of account IDs.
- * → Prevents deadlocks when two payments involve the same two accounts.
- * Example: Payment A: [acc-1 → acc-2], Payment B: [acc-2 → acc-1]
- * Both will try to lock acc-1 first → safe, no deadlock.
+ * 2. ORDERED LOCKING - always acquire locks in alphabetical order of account IDs.
+ * -> Prevents deadlocks when two payments involve the same two accounts.
+ * Example: Payment A: [acc-1 -> acc-2], Payment B: [acc-2 -> acc-1]
+ * Both will try to lock acc-1 first -> safe, no deadlock.
  * <p>
- * 3. MULTI-LOCK — uses RedissonMultiLock to acquire both locks atomically.
- * → Either both are acquired or neither is.
+ * 3. MULTI-LOCK - uses RedissonMultiLock to acquire both locks atomically.
+ * -> Either both are acquired or neither is.
  * <p>
- * 4. GUARANTEED RELEASE — unlock always in finally block.
- * → Watchdog stops automatically when unlock() is called.
+ * 4. GUARANTEED RELEASE - unlock always in finally block.
+ * -> Watchdog stops automatically when unlock() is called.
  */
 @Slf4j
 @Component
@@ -82,7 +82,7 @@ public class RedissonPaymentLockService implements PaymentLockService {
 
 	/**
 	 * Always sort account IDs alphabetically to prevent deadlocks.
-	 * Both [A→B] and [B→A] payments will try to lock A first.
+	 * Both [A->B] and [B->A] payments will try to lock A first.
 	 */
 	private List<RLock> orderedLocks(String id1, String id2) {
 		String[] sorted = {id1, id2};
@@ -100,7 +100,7 @@ public class RedissonPaymentLockService implements PaymentLockService {
 				log.debug("Lock released [{}, {}]", src, tgt);
 			}
 		} catch (Exception e) {
-			// Lock may have expired — log but don't re-throw (already in finally)
+			// Lock may have expired - log but don't re-throw (already in finally)
 			log.warn("Error releasing lock [{}, {}]: {}", src, tgt, e.getMessage());
 		}
 	}

@@ -19,15 +19,15 @@ import io.github.resilience4j.retry.annotation.Retry;
 import lombok.extern.slf4j.Slf4j;
 
 /**
- * Primary rate provider — exchangeratesapi.io.
+ * Primary rate provider - exchangeratesapi.io.
  * <p>
  * API: GET /latest?base=EUR&symbols=PLN,USD,GBP,...
  * Response: { "base": "EUR", "date": "2024-03-06", "rates": { "PLN": 4.285, ... } }
  * <p>
- * Circuit Breaker wraps all calls — opens after 5 failures within 10s window.
+ * Circuit Breaker wraps all calls - opens after 5 failures within 10s window.
  * When open, falls back to EcbRateClient automatically.
  * <p>
- * Uses WebClient (non-blocking) — rate fetches don't block virtual threads.
+ * Uses WebClient (non-blocking) - rate fetches don't block virtual threads.
  */
 @Slf4j
 @Component

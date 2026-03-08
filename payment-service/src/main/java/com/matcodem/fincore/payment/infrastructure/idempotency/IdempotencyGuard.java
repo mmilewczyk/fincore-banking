@@ -13,7 +13,7 @@ import lombok.extern.slf4j.Slf4j;
  * Usage pattern in consumers:
  * <p>
  * if (!idempotencyGuard.tryProcess(eventId, "fraud.case.approved", GROUP_ID)) {
- * log.info("Duplicate event {} — skipping", eventId);
+ * log.info("Duplicate event {} - skipping", eventId);
  * ack.acknowledge();
  * return;
  * }
@@ -21,13 +21,13 @@ import lombok.extern.slf4j.Slf4j;
  * <p>
  * Implementation:
  * INSERT INTO processed_events ON CONFLICT DO NOTHING
- * Returns true  → first time we see this event, safe to process
- * Returns false → already processed, skip
+ * Returns true  -> first time we see this event, safe to process
+ * Returns false -> already processed, skip
  * <p>
  * Thread-safe: INSERT is atomic at DB level. Two concurrent pods trying
- * to process the same event will race on the INSERT — one wins, one skips.
+ * to process the same event will race on the INSERT - one wins, one skips.
  * <p>
- * Retention cleanup runs daily — removes events older than 30 days.
+ * Retention cleanup runs daily - removes events older than 30 days.
  */
 @Slf4j
 @Component
@@ -49,14 +49,14 @@ public class IdempotencyGuard {
 
 	/**
 	 * @return true if this event should be processed (first time seen)
-	 * false if already processed (duplicate — skip)
+	 * false if already processed (duplicate - skip)
 	 */
 	public boolean tryProcess(String eventId, String eventType, String consumerGroup) {
 		int rowsInserted = jdbcTemplate.update(INSERT_SQL, eventId, eventType, consumerGroup);
 		boolean isNew = rowsInserted > 0;
 
 		if (!isNew) {
-			log.warn("Duplicate event detected — skipping: eventId={}, type={}, group={}",
+			log.warn("Duplicate event detected - skipping: eventId={}, type={}, group={}",
 					eventId, eventType, consumerGroup);
 		}
 

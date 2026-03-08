@@ -5,7 +5,7 @@ package com.matcodem.fincore.payment.domain.port.out;
  */
 public interface PaymentLockService {
 	/**
-	 * Execute action with lock — template method pattern.
+	 * Execute action with lock - template method pattern.
 	 * Handles acquisition, execution, and guaranteed release.
 	 */
 	void executeWithLock(String sourceAccountId, String targetAccountId, Runnable action);

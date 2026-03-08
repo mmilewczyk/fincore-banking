@@ -23,16 +23,16 @@ import jakarta.validation.ConstraintViolationException;
 import lombok.extern.slf4j.Slf4j;
 
 /**
- * Global exception handler — RFC 7807 ProblemDetail responses.
+ * Global exception handler - RFC 7807 ProblemDetail responses.
  * <p>
  * Rules:
- * - 4xx → log.warn (client error, expected, high-frequency)
- * - 5xx → log.error with full stack trace (our bug, alert-worthy)
+ * - 4xx -> log.warn (client error, expected, high-frequency)
+ * - 5xx -> log.error with full stack trace (our bug, alert-worthy)
  * - Never expose stack traces, class names, or internal messages to the client
  * - Each exception type maps to a stable, machine-readable error type URI
  * <p>
  * Stability contract: error type URIs (fincore.bank.pl/errors/...) are stable
- * API contracts — clients may build logic on them. Don't rename them without
+ * API contracts - clients may build logic on them. Don't rename them without
  * a deprecation cycle.
  */
 @Slf4j
@@ -90,7 +90,7 @@ public class GlobalExceptionHandler {
 	}
 
 	/**
-	 * Distributed lock timeout — payment system under load or lock contention
+	 * Distributed lock timeout - payment system under load or lock contention
 	 */
 	@ExceptionHandler(LockAcquisitionException.class)
 	public ResponseEntity<ProblemDetail> handleLockTimeout(LockAcquisitionException ex) {
@@ -119,11 +119,11 @@ public class GlobalExceptionHandler {
 	}
 
 	/**
-	 * Catch-all — never expose internals
+	 * Catch-all - never expose internals
 	 */
 	@ExceptionHandler(Exception.class)
 	public ResponseEntity<ProblemDetail> handleUnexpected(Exception ex) {
-		log.error("Unexpected error — this should not happen, investigate immediately", ex);
+		log.error("Unexpected error - this should not happen, investigate immediately", ex);
 		return problem(HttpStatus.INTERNAL_SERVER_ERROR, "internal-error",
 				"Internal Server Error",
 				"An unexpected error occurred. Contact support with the trace ID from the logs.");

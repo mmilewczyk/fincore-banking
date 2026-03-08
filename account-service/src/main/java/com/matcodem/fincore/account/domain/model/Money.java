@@ -6,7 +6,7 @@ import java.util.Objects;
 
 /**
  * Value Object representing monetary amount with currency.
- * Immutable by design — all operations return new instances.
+ * Immutable by design - all operations return new instances.
  */
 public final class Money {
 

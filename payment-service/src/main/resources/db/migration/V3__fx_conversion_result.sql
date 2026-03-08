@@ -5,7 +5,7 @@
 --   Only FX_CONVERSION payments have these values.
 --   INTERNAL_TRANSFER, EXTERNAL_TRANSFER, BILL_PAYMENT leave them NULL.
 --   Flyway cannot add NOT NULL columns without defaults to existing tables
---   without a data migration — nullable is the correct approach here.
+--   without a data migration - nullable is the correct approach here.
 --
 -- converted_amount + converted_currency:
 --   The PLN amount that was credited to the target account.

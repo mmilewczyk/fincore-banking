@@ -15,16 +15,16 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
 /**
- * Outbox Poller — publishes pending domain events to Kafka.
+ * Outbox Poller - publishes pending domain events to Kafka.
  * <p>
  * ── PATTERN ───────────────────────────────────────────────────────────────────
  * The Transactional Outbox pattern guarantees at-least-once event delivery:
  * 1. Payment + outbox row written atomically in one DB transaction
  * 2. This poller reads PENDING outbox rows and publishes to Kafka
- * 3. On broker ACK → row marked SENT in same transaction
+ * 3. On broker ACK -> row marked SENT in same transaction
  * <p>
  * ── TRANSACTION DESIGN ────────────────────────────────────────────────────────
- * pollAndPublish() has NO @Transactional — it iterates rows and delegates each
+ * pollAndPublish() has NO @Transactional - it iterates rows and delegates each
  * to publishSingle() which opens its own REQUIRES_NEW transaction.
  * <p>
  * Why REQUIRES_NEW per message (not one big transaction for the batch)?
@@ -32,7 +32,7 @@ import lombok.extern.slf4j.Slf4j;
  * - SELECT FOR UPDATE SKIP LOCKED is held per-row for minimum duration
  * - Spring's @Transactional(REQUIRES_NEW) suspends the caller's transaction
  * (none here) and opens a fresh one, so the JPA flush + commit happens
- * immediately after markSent/markFailed — not at end of outer method
+ * immediately after markSent/markFailed - not at end of outer method
  * <p>
  * ── CONCURRENCY ───────────────────────────────────────────────────────────────
  * SELECT FOR UPDATE SKIP LOCKED (in SpringDataOutboxRepository) ensures that
@@ -44,7 +44,7 @@ import lombok.extern.slf4j.Slf4j;
  * kafkaTemplate.send(...).get() blocks until the broker acknowledges the write.
  * The DB markSent() call happens only after the broker ACK, within the same
  * transaction. If the JVM crashes between ACK and commit, the row stays PENDING
- * and is republished on next poll — Kafka consumers must be idempotent.
+ * and is republished on next poll - Kafka consumers must be idempotent.
  * <p>
  * Alternative (whenComplete) runs in Kafka callback thread, outside Spring's
  * transaction context. markSent() would not be part of the DB transaction.
@@ -62,7 +62,7 @@ public class OutboxPoller {
 	private static final int BATCH_SIZE = 100;
 
 	/**
-	 * fixedDelay — next poll starts 500ms AFTER current poll completes.
+	 * fixedDelay - next poll starts 500ms AFTER current poll completes.
 	 * Prevents concurrent execution on a single instance.
 	 * Cross-instance concurrency is handled by SELECT FOR UPDATE SKIP LOCKED.
 	 */
@@ -85,7 +85,7 @@ public class OutboxPoller {
 	 */
 	@Transactional
 	public void publishOne(OutboxMessage message) {
-		// Derive Kafka topic from event type: "payment.completed" → "fincore.payments.payment-completed"
+		// Derive Kafka topic from event type: "payment.completed" -> "fincore.payments.payment-completed"
 		String topic = "fincore.payments." + message.getEventType().replace(".", "-");
 
 		try {
@@ -98,14 +98,14 @@ public class OutboxPoller {
 
 			meterRegistry.counter("outbox.publish.success",
 					"eventType", message.getEventType()).increment();
-			log.debug("Published outbox {} → topic: {}", message.getId(), topic);
+			log.debug("Published outbox {} -> topic: {}", message.getId(), topic);
 
 		} catch (Exception ex) {
 			message.markFailed();
 			outboxRepository.markFailed(message);
 
 			if (message.isDeadLetter()) {
-				log.error("DEAD LETTER: outbox message {} exhausted all retries — eventType={}, aggregateId={}",
+				log.error("DEAD LETTER: outbox message {} exhausted all retries - eventType={}, aggregateId={}",
 						message.getId(), message.getEventType(), message.getAggregateId());
 				meterRegistry.counter("outbox.dead_letter.total",
 						"eventType", message.getEventType()).increment();

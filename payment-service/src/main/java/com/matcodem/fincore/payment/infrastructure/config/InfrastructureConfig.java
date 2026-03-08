@@ -22,9 +22,9 @@ import reactor.netty.http.client.HttpClient;
  * Infrastructure beans: Redisson, WebClient.Builder.
  * <p>
  * WebClient timeouts (Netty-level):
- * connect-timeout: 3s  — fail fast if the target service is unreachable
- * read-timeout:    5s  — fail if response takes > 5s (account/FX service SLA)
- * write-timeout:   5s  — fail if request body cannot be sent in 5s
+ * connect-timeout: 3s  - fail fast if the target service is unreachable
+ * read-timeout:    5s  - fail if response takes > 5s (account/FX service SLA)
+ * write-timeout:   5s  - fail if request body cannot be sent in 5s
  * <p>
  * These are TCP-level timeouts, separate from Resilience4j TimeLimiter
  * (which is a circuit-breaker-level timeout). Both are needed:

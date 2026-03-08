@@ -25,18 +25,18 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
 /**
- * REST API for fraud case management — used by the compliance dashboard.
+ * REST API for fraud case management - used by the compliance dashboard.
  * <p>
  * Endpoints:
- * GET  /api/v1/fraud/cases/{id}       — get a specific case
- * GET  /api/v1/fraud/cases/review     — list all cases pending manual review
- * POST /api/v1/fraud/cases/{id}/approve  — compliance officer approves
- * POST /api/v1/fraud/cases/{id}/confirm  — compliance officer confirms fraud
- * GET  /api/v1/fraud/cases/payment/{paymentId} — lookup by payment
+ * GET  /api/v1/fraud/cases/{id}       - get a specific case
+ * GET  /api/v1/fraud/cases/review     - list all cases pending manual review
+ * POST /api/v1/fraud/cases/{id}/approve  - compliance officer approves
+ * POST /api/v1/fraud/cases/{id}/confirm  - compliance officer confirms fraud
+ * GET  /api/v1/fraud/cases/payment/{paymentId} - lookup by payment
  * <p>
  * Security:
- * GET endpoints      → ROLE_COMPLIANCE or ROLE_ADMIN
- * approve/confirm    → ROLE_COMPLIANCE only (segregation of duties)
+ * GET endpoints      -> ROLE_COMPLIANCE or ROLE_ADMIN
+ * approve/confirm    -> ROLE_COMPLIANCE only (segregation of duties)
  */
 @Slf4j
 @RestController

@@ -3,7 +3,7 @@ package com.matcodem.fincore.fraud.domain.model;
 import java.util.Objects;
 
 /**
- * Value Object — Risk Score from 0 (no risk) to 100 (certain fraud).
+ * Value Object - Risk Score from 0 (no risk) to 100 (certain fraud).
  * <p>
  * Thresholds:
  * 0–29  -> LOW    (approve)
@@ -44,7 +44,7 @@ public final class RiskScore {
 	}
 
 	/**
-	 * Combines two scores — takes the higher value, never exceeds MAX.
+	 * Combines two scores - takes the higher value, never exceeds MAX.
 	 * Used when aggregating multiple rule results.
 	 */
 	public RiskScore combine(RiskScore other) {
@@ -52,7 +52,7 @@ public final class RiskScore {
 	}
 
 	/**
-	 * Adds penalty points — saturates at MAX.
+	 * Adds penalty points - saturates at MAX.
 	 */
 	public RiskScore add(int penalty) {
 		return new RiskScore(Math.min(MAX, this.value + penalty));

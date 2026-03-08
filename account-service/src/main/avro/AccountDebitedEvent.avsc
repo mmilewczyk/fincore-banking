@@ -40,7 +40,7 @@
         "precision": 19,
         "scale": 4
       },
-      "doc": "Balance after debit — used for statement generation and real-time balance push"
+      "doc": "Balance after debit - used for statement generation and real-time balance push"
     },
     {
       "name": "reference",

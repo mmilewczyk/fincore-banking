@@ -62,7 +62,7 @@ spring:
                 name: fx-service
                 fallbackUri: forward:/fallback/fx-service
 
-        # Fraud Service — compliance only
+        # Fraud Service - compliance only
         - id: fraud-service
           uri: http://fraud-detection-service.fincore.svc.cluster.local:8083
           predicates:

@@ -61,7 +61,7 @@ public class FxController {
 	}
 
 	/**
-	 * Quote a conversion — no side effects, no persistence
+	 * Quote a conversion - no side effects, no persistence
 	 */
 	@PostMapping("/quote")
 	@Timed(value = "api.fx.quote")

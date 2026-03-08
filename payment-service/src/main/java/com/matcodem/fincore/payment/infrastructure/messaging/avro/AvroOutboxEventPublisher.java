@@ -22,10 +22,10 @@ import lombok.extern.slf4j.Slf4j;
  * WHY SERIALIZE AT WRITE TIME (not at poll time)?
  * Serializing at write time means the Avro bytes are committed to the DB in the
  * same transaction as the payment. If Schema Registry is temporarily unavailable
- * at poll time, we don't want to fail publishing — the bytes are already encoded.
+ * at poll time, we don't want to fail publishing - the bytes are already encoded.
  * <p>
  * Trade-off: if the schema changes between write and publish, the stored bytes
- * use the old schema ID. This is fine — Schema Registry stores all versions
+ * use the old schema ID. This is fine - Schema Registry stores all versions
  * and the consumer fetches the schema by the ID embedded in the message bytes.
  * <p>
  * AVRO WIRE FORMAT (Confluent):
@@ -47,7 +47,7 @@ public class AvroOutboxEventPublisher implements OutboxEventPublisher {
 	private final AvroEventMapper avroEventMapper;
 	private final KafkaAvroSerializer avroSerializer;
 
-	// Topic prefix — must match OutboxPoller topic derivation logic
+	// Topic prefix - must match OutboxPoller topic derivation logic
 	private static final String TOPIC_PREFIX = "fincore.payments.";
 
 	@Override
@@ -55,16 +55,16 @@ public class AvroOutboxEventPublisher implements OutboxEventPublisher {
 		SpecificRecord avroRecord = avroEventMapper.toAvro(event);
 
 		if (avroRecord == null) {
-			// This should never happen in production — means a new domain event
+			// This should never happen in production - means a new domain event
 			// was added without a corresponding .avsc file.
-			log.error("BUG: No Avro schema mapping for event type '{}' — dropping event for payment {}. " +
+			log.error("BUG: No Avro schema mapping for event type '{}' - dropping event for payment {}. " +
 							"Add a .avsc schema file and update AvroEventMapper.",
 					event.eventType(), event.aggregateId());
 			throw new IllegalStateException(
 					"No Avro schema mapping for event type: " + event.eventType());
 		}
 
-		// Derive topic from event type: "payment.completed" → "fincore.payments.payment-completed"
+		// Derive topic from event type: "payment.completed" -> "fincore.payments.payment-completed"
 		String topic = TOPIC_PREFIX + event.eventType().replace(".", "-");
 
 		// Serialize to Avro bytes (Confluent wire format: magic byte + schema ID + payload)

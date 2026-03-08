@@ -105,7 +105,7 @@ public class PaymentController {
 	}
 
 	/**
-	 * Manually trigger processing — normally done async by a scheduler.
+	 * Manually trigger processing - normally done async by a scheduler.
 	 * Useful for testing and admin operations.
 	 */
 	@PostMapping("/{paymentId}/process")

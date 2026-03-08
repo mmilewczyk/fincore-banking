@@ -11,7 +11,7 @@ public interface ConvertCurrencyUseCase {
 	FxConversion convert(ConvertCommand command);
 
 	/**
-	 * Quote the rate and fee without executing — for UI preview
+	 * Quote the rate and fee without executing - for UI preview
 	 */
 	ExchangeRate.ConversionResult quote(CurrencyPair pair, BigDecimal amount,
 	                                    ExchangeRate.ConversionDirection direction);

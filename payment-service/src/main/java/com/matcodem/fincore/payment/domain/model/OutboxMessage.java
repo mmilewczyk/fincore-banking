@@ -5,11 +5,11 @@ import java.util.Objects;
 import java.util.UUID;
 
 /**
- * Outbox Pattern — guaranteed event delivery.
+ * Outbox Pattern - guaranteed event delivery.
  * <p>
  * Problem it solves:
  * Without outbox, we risk: payment saved to DB but Kafka publish fails
- * → payment processed but nobody notified → data inconsistency.
+ * -> payment processed but nobody notified -> data inconsistency.
  * <p>
  * Solution:
  * 1. Save payment + outbox message in ONE transaction (same DB)

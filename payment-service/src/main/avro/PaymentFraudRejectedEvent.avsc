@@ -48,7 +48,7 @@
         "int"
       ],
       "default": null,
-      "doc": "Composite fraud score 0-100. Added in v2 — null in messages from older payment-service versions (BACKWARD compatible)."
+      "doc": "Composite fraud score 0-100. Added in v2 - null in messages from older payment-service versions (BACKWARD compatible)."
     },
     {
       "name": "schemaVersion",

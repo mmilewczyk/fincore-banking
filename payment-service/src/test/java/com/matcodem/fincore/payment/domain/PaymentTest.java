@@ -107,7 +107,7 @@ class PaymentTest {
 	class ProcessingLifecycle {
 
 		@Test
-		@DisplayName("PENDING → PROCESSING → COMPLETED happy path")
+		@DisplayName("PENDING -> PROCESSING -> COMPLETED happy path")
 		void happyPath() {
 			payment.startProcessing();
 			assertThat(payment.isProcessing()).isTrue();
@@ -139,7 +139,7 @@ class PaymentTest {
 		}
 
 		@Test
-		@DisplayName("PENDING → FAILED")
+		@DisplayName("PENDING -> FAILED")
 		void shouldFailFromPending() {
 			payment.fail("Insufficient funds");
 
@@ -152,7 +152,7 @@ class PaymentTest {
 		}
 
 		@Test
-		@DisplayName("PROCESSING → FAILED")
+		@DisplayName("PROCESSING -> FAILED")
 		void shouldFailFromProcessing() {
 			payment.startProcessing();
 			payment.fail("Account frozen");

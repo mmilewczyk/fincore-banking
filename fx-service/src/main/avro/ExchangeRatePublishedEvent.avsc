@@ -22,7 +22,7 @@
     {
       "name": "currencyPair",
       "type": "string",
-      "doc": "e.g. EUR/PLN — base/quote"
+      "doc": "e.g. EUR/PLN - base/quote"
     },
     {
       "name": "midRate",
@@ -32,7 +32,7 @@
         "precision": 19,
         "scale": 8
       },
-      "doc": "Mid-market rate — scale=8 for precision required in FX (e.g. 4.28150000)"
+      "doc": "Mid-market rate - scale=8 for precision required in FX (e.g. 4.28150000)"
     },
     {
       "name": "bidRate",

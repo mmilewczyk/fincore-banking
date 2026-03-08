@@ -13,10 +13,10 @@ import com.matcodem.fincore.fx.domain.event.FxConversionFailedEvent;
 /**
  * FxConversion Aggregate Root.
  * <p>
- * Records each completed currency conversion — the contractual agreement
+ * Records each completed currency conversion - the contractual agreement
  * between the bank and customer for a specific amount at a specific rate.
  * <p>
- * Once EXECUTED, a conversion is immutable — it represents a financial commitment.
+ * Once EXECUTED, a conversion is immutable - it represents a financial commitment.
  * Corrections are modelled as reversals + new conversions (audit trail preserved).
  */
 public class FxConversion {

@@ -22,7 +22,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.Setter;
 
 /**
- * Audit log adapter — immutable audit trail of all account operations.
+ * Audit log adapter - immutable audit trail of all account operations.
  * Compliance requirement: every state change must be recorded.
  */
 @Component

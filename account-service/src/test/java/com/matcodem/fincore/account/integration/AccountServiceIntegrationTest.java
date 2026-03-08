@@ -3,8 +3,8 @@ package com.matcodem.fincore.account.integration;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
@@ -56,7 +56,7 @@ class AccountServiceIntegrationTest {
 	private OpenAccountUseCase openAccountUseCase;
 
 	@Test
-	@DisplayName("POST /api/v1/accounts — should open account and return 201")
+	@DisplayName("POST /api/v1/accounts - should open account and return 201")
 	void shouldOpenAccount() throws Exception {
 		mockMvc.perform(post("/api/v1/accounts")
 						.with(jwt().jwt(j -> j
@@ -79,7 +79,7 @@ class AccountServiceIntegrationTest {
 	}
 
 	@Test
-	@DisplayName("GET /api/v1/accounts/{id} — should return 404 for unknown account")
+	@DisplayName("GET /api/v1/accounts/{id} - should return 404 for unknown account")
 	void shouldReturn404ForUnknownAccount() throws Exception {
 		mockMvc.perform(get("/api/v1/accounts/00000000-0000-0000-0000-000000000000")
 						.with(jwt().jwt(j -> j
@@ -92,11 +92,13 @@ class AccountServiceIntegrationTest {
 	}
 
 	@Test
-	@DisplayName("POST /api/v1/accounts — should return 401 without JWT")
+	@DisplayName("POST /api/v1/accounts - should return 401 without JWT")
 	void shouldReturn401WithoutJwt() throws Exception {
 		mockMvc.perform(post("/api/v1/accounts")
 						.contentType(MediaType.APPLICATION_JSON)
-						.content("""{ "currency": "PLN" }"""))
+						.content("""
+								{ "currency": "PLN" }
+								"""))
 				.andExpect(status().isUnauthorized());
 	}
 }

@@ -33,7 +33,7 @@ import io.confluent.kafka.serializers.KafkaAvroDeserializerConfig;
 import io.confluent.kafka.serializers.KafkaAvroSerializer;
 
 /**
- * Kafka configuration for fraud-detection-service — Avro edition.
+ * Kafka configuration for fraud-detection-service - Avro edition.
  * <p>
  * Consumer: reads PaymentInitiatedEvent (Avro) from payment-service
  * - KafkaAvroDeserializer + specific.avro.reader=true
@@ -45,11 +45,11 @@ import io.confluent.kafka.serializers.KafkaAvroSerializer;
  * (DLT publisher uses String serializer, fraud events use Avro)
  * <p>
  * TWO PRODUCER FACTORIES:
- * fraudDltProducerFactory → KafkaTemplate<String, String> → DLT publishing (raw bytes for poison pills)
- * avroProducerFactory     → KafkaTemplate<String, Object> → fraud event publishing (Avro)
+ * fraudDltProducerFactory -> KafkaTemplate<String, String> -> DLT publishing (raw bytes for poison pills)
+ * avroProducerFactory     -> KafkaTemplate<String, Object> -> fraud event publishing (Avro)
  * <p>
  * The DLT KafkaTemplate must use String serializer because ErrorHandlingDeserializer
- * may forward raw bytes when deserialization fails — Avro serializer can't handle raw bytes.
+ * may forward raw bytes when deserialization fails - Avro serializer can't handle raw bytes.
  */
 @Configuration
 @EnableKafka
@@ -75,7 +75,7 @@ public class FraudKafkaConfig {
 		props.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, ErrorHandlingDeserializer.class);
 		props.put(ErrorHandlingDeserializer.KEY_DESERIALIZER_CLASS, StringDeserializer.class);
 
-		// Value: Avro — wrapped for poison pill protection
+		// Value: Avro - wrapped for poison pill protection
 		props.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, ErrorHandlingDeserializer.class);
 		props.put(ErrorHandlingDeserializer.VALUE_DESERIALIZER_CLASS, KafkaAvroDeserializer.class);
 		props.put(AbstractKafkaSchemaSerDeConfig.SCHEMA_REGISTRY_URL_CONFIG, schemaRegistryUrl);
@@ -94,10 +94,10 @@ public class FraudKafkaConfig {
 		factory.setConsumerFactory(fraudConsumerFactory);
 		factory.getContainerProperties().setAckMode(ContainerProperties.AckMode.MANUAL_IMMEDIATE);
 
-		// DLT recoverer uses String KafkaTemplate (not Avro) — DLT messages are raw bytes
+		// DLT recoverer uses String KafkaTemplate (not Avro) - DLT messages are raw bytes
 		var recoverer = new DeadLetterPublishingRecoverer(fraudDltKafkaTemplate);
 		var errorHandler = new DefaultErrorHandler(recoverer, new FixedBackOff(2_000L, 3));
-		errorHandler.addNotRetryableExceptions(ClassCastException.class); // schema mismatch → DLT immediately
+		errorHandler.addNotRetryableExceptions(ClassCastException.class); // schema mismatch -> DLT immediately
 		factory.setCommonErrorHandler(errorHandler);
 
 		return factory;

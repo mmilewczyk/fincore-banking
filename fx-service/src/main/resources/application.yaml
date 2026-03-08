@@ -39,7 +39,7 @@ spring:
   cache:
     type: redis
     redis:
-      time-to-live: 60000  # 60 seconds — tight TTL for financial data
+      time-to-live: 60000  # 60 seconds - tight TTL for financial data
 
   security:
     oauth2:

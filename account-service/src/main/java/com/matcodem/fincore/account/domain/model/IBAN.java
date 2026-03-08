@@ -4,12 +4,12 @@ import java.util.Objects;
 import java.util.regex.Pattern;
 
 /**
- * Value Object — International Bank Account Number.
+ * Value Object - International Bank Account Number.
  * Validates format and check digits on construction.
  */
 public final class IBAN {
 
-	// Simplified IBAN pattern — full validation via check digits below
+	// Simplified IBAN pattern - full validation via check digits below
 	private static final Pattern IBAN_PATTERN = Pattern.compile("[A-Z]{2}[0-9]{2}[A-Z0-9]{1,30}");
 	private static final int MOD = 97;
 

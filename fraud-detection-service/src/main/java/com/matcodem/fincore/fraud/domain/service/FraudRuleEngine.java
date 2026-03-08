@@ -15,17 +15,17 @@ import com.matcodem.fincore.fraud.domain.rule.FraudRule;
 import lombok.extern.slf4j.Slf4j;
 
 /**
- * Fraud Rule Engine — Domain Service.
+ * Fraud Rule Engine - Domain Service.
  * <p>
  * Orchestrates all registered FraudRules into a scoring pipeline:
  * <p>
  * 1. Rules are sorted by getOrder() (cheapest/fastest first)
  * 2. Each enabled rule evaluates the PaymentContext
- * 3. Scores are aggregated using RiskScore.combine() — takes the maximum
+ * 3. Scores are aggregated using RiskScore.combine() - takes the maximum
  * 4. All triggered rules contribute to the final composite score
  * 5. Short-circuit: if score reaches CRITICAL (85+), skip remaining rules
  * <p>
- * This is a pure domain service — no Spring annotations, no infrastructure.
+ * This is a pure domain service - no Spring annotations, no infrastructure.
  * Easily testable in isolation.
  */
 @Slf4j
@@ -64,14 +64,14 @@ public class FraudRuleEngine {
 
 				if (result.triggered()) {
 					compositeScore = compositeScore.add(result.score().getValue());
-					log.info("Rule '{}' triggered for payment {} — score: +{}, reason: {}",
+					log.info("Rule '{}' triggered for payment {} - score: +{}, reason: {}",
 							rule.getName(), context.getPaymentId(),
 							result.score().getValue(), result.reason());
 				}
 
-				// Short-circuit on CRITICAL score — no point evaluating more rules
+				// Short-circuit on CRITICAL score - no point evaluating more rules
 				if (compositeScore.getLevel() == CRITICAL) {
-					log.warn("CRITICAL risk score reached for payment {} — short-circuiting rule evaluation",
+					log.warn("CRITICAL risk score reached for payment {} - short-circuiting rule evaluation",
 							context.getPaymentId());
 					break;
 				}
@@ -85,7 +85,7 @@ public class FraudRuleEngine {
 			}
 		}
 
-		log.info("Fraud evaluation complete for payment {} — composite score: {}, level: {}",
+		log.info("Fraud evaluation complete for payment {} - composite score: {}, level: {}",
 				context.getPaymentId(), compositeScore.getValue(), compositeScore.getLevel());
 
 		return new EvaluationResult(compositeScore, results);

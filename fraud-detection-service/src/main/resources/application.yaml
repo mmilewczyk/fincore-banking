@@ -34,7 +34,7 @@ spring:
   cache:
     type: redis
     redis:
-      time-to-live: 300000  # 5 minutes — behavioral context cache
+      time-to-live: 300000  # 5 minutes - behavioral context cache
 
   security:
     oauth2:
@@ -47,7 +47,7 @@ server:
   port: 8083
   shutdown: graceful
 
-# Fraud rule configuration — tunable without code changes
+# Fraud rule configuration - tunable without code changes
 fraud:
   rules:
     large-amount:

@@ -1,0 +1,109 @@
+spring:
+  application:
+    name: notification-service
+
+  datasource:
+    url: jdbc:postgresql://localhost:5436/notification_db
+    username: fincore
+    password: fincore_secret
+    hikari:
+      maximum-pool-size: 10
+      minimum-idle: 3
+      pool-name: NotificationHikariCP
+      leak-detection-threshold: 60000
+
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        jdbc.batch_size: 50
+        order_inserts: true
+    show-sql: false
+
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+
+  kafka:
+    bootstrap-servers: localhost:9092
+    consumer:
+      group-id: notification-service
+      auto-offset-reset: earliest
+      enable-auto-commit: false
+      max-poll-records: 20
+      properties:
+        schema.registry.url: ${kafka.schema-registry.url:http://localhost:8081}
+        specific.avro.reader: true
+
+  mail:
+    host: ${SMTP_HOST:smtp.sendgrid.net}
+    port: ${SMTP_PORT:587}
+    username: ${SMTP_USERNAME:apikey}
+    password: ${SMTP_PASSWORD:}
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+          connectiontimeout: 5000
+          timeout: 5000
+
+# ─── Schema Registry ──────────────────────────────────────────────────────────
+kafka:
+  schema-registry:
+    url: http://localhost:8081
+
+# ─── Notification providers ───────────────────────────────────────────────────
+notification:
+  email:
+    from-address: noreply@fincore.com
+    from-name: FinCore Banking
+
+  sms:
+    account-sid: ${TWILIO_ACCOUNT_SID:}
+    auth-token: ${TWILIO_AUTH_TOKEN:}
+    from-number: ${TWILIO_FROM_NUMBER:+48000000000}
+
+  firebase:
+    credentials-base64: ${GOOGLE_APPLICATION_CREDENTIALS_BASE64:}
+
+  poller:
+    batch-size: 50
+    fixed-delay-ms: 1000
+
+server:
+  port: 8086
+  shutdown: graceful
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus,metrics,loggers
+  endpoint:
+    health:
+      show-details: when-authorized
+      probes:
+        enabled: true
+  metrics:
+    export:
+      prometheus:
+        enabled: true
+    tags:
+      application: notification-service
+  tracing:
+    sampling:
+      probability: 1.0
+  otlp:
+    tracing:
+      endpoint: http://localhost:4318/v1/traces
+
+logging:
+  level:
+    com.fincore: DEBUG
+    org.springframework.kafka: INFO
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] [%X{traceId}/%X{spanId}] %-5level %logger{36} - %msg%n"

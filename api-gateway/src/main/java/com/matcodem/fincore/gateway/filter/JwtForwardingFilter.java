@@ -16,19 +16,19 @@ import lombok.extern.slf4j.Slf4j;
 import reactor.core.publisher.Mono;
 
 /**
- * Global filter — extracts JWT claims and forwards them as HTTP headers.
+ * Global filter - extracts JWT claims and forwards them as HTTP headers.
  * <p>
  * Downstream services can trust these headers because:
  * 1. Gateway validates the JWT signature (public key from Keycloak)
  * 2. Only requests that pass JWT validation reach this filter
- * 3. Services are not exposed externally — only reachable via Gateway
+ * 3. Services are not exposed externally - only reachable via Gateway
  * (enforced by K8s NetworkPolicy: ClusterIP Services, no public NodePort/LoadBalancer)
  * <p>
  * Headers added:
- * X-Auth-User-Id  — JWT subject (Keycloak user UUID)
- * X-Auth-Username — preferred_username claim
- * X-Auth-Roles    — comma-separated roles from realm_access.roles
- * X-Trace-Id      — propagated from MDC for distributed tracing
+ * X-Auth-User-Id  - JWT subject (Keycloak user UUID)
+ * X-Auth-Username - preferred_username claim
+ * X-Auth-Roles    - comma-separated roles from realm_access.roles
+ * X-Trace-Id      - propagated from MDC for distributed tracing
  * <p>
  * The original Authorization: Bearer header is also forwarded so downstream
  * services can independently validate if they choose to (defence in depth).
@@ -58,7 +58,7 @@ public class JwtForwardingFilter implements GlobalFilter, Ordered {
 						roles = String.join(",", roleList);
 					}
 
-					log.debug("Forwarding identity headers — userId: {}, username: {}", userId, username);
+					log.debug("Forwarding identity headers - userId: {}, username: {}", userId, username);
 
 					String finalRoles = roles;
 					ServerWebExchange mutated = exchange.mutate()

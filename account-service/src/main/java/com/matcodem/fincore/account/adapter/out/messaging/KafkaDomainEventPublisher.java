@@ -35,7 +35,7 @@ public class KafkaDomainEventPublisher implements DomainEventPublisher {
 						log.error("Failed to publish Avro account event {} to {}: {}",
 								event.eventType(), topic, ex.getMessage());
 					} else {
-						log.debug("Published Avro account event {} → {} offset={}",
+						log.debug("Published Avro account event {} -> {} offset={}",
 								event.eventType(), topic,
 								result.getRecordMetadata().offset());
 					}

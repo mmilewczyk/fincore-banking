@@ -16,7 +16,7 @@ import com.matcodem.fincore.payment.domain.event.PaymentInitiatedEvent;
 /**
  * Payment Aggregate Root.
  * <p>
- * Lifecycle: PENDING → PROCESSING → COMPLETED | FAILED | CANCELLED
+ * Lifecycle: PENDING -> PROCESSING -> COMPLETED | FAILED | CANCELLED
  * <p>
  * Key invariants enforced here:
  * - A payment can only be processed once (status guard)
@@ -40,14 +40,14 @@ public class Payment {
 	private long version;
 
 	/**
-	 * FX conversion result — populated by lockFxConversion() for FX_CONVERSION payments.
+	 * FX conversion result - populated by lockFxConversion() for FX_CONVERSION payments.
 	 * Null for all other payment types.
 	 * <p>
 	 * convertedAmount: PLN amount credited to target account. Differs from amount (source currency).
 	 * Example: amount=100 EUR, convertedAmount=428.50 PLN.
 	 * creditAccount() in ProcessPaymentService MUST use this for FX payments, not amount.
 	 * <p>
-	 * fxConversionId: ID from FX Service — stored for audit and reversal.
+	 * fxConversionId: ID from FX Service - stored for audit and reversal.
 	 * Compliance uses this to unwind the FX leg on fraud-confirmed reversals.
 	 */
 	private Money convertedAmount;   // null for non-FX payments
@@ -73,7 +73,7 @@ public class Payment {
 	}
 
 	/**
-	 * Initiates a new payment — validates invariants and records event.
+	 * Initiates a new payment - validates invariants and records event.
 	 */
 	public static Payment initiate(
 			IdempotencyKey idempotencyKey,
@@ -113,7 +113,7 @@ public class Payment {
 	}
 
 	/**
-	 * Reconstitution from persistence — no events recorded.
+	 * Reconstitution from persistence - no events recorded.
 	 */
 	public static Payment reconstitute(
 			PaymentId id, IdempotencyKey idempotencyKey,
@@ -135,7 +135,7 @@ public class Payment {
 	}
 
 	/**
-	 * Marks payment as being processed — called when distributed lock is acquired.
+	 * Marks payment as being processed - called when distributed lock is acquired.
 	 */
 	public void startProcessing() {
 		if (status != PaymentStatus.PENDING) {
@@ -219,7 +219,7 @@ public class Payment {
 	public void cancel(String reason) {
 		if (status != PaymentStatus.PENDING) {
 			throw new IllegalStateException(
-					"Cannot cancel payment in status: %s — only PENDING payments can be cancelled".formatted(status)
+					"Cannot cancel payment in status: %s - only PENDING payments can be cancelled".formatted(status)
 			);
 		}
 		this.status = PaymentStatus.CANCELLED;
@@ -295,7 +295,7 @@ public class Payment {
 	/**
 	 * Returns the amount to credit to the target account.
 	 * For FX payments: convertedAmount (PLN). For all others: original amount.
-	 * ProcessPaymentService uses this — never hardcodes which amount to credit.
+	 * ProcessPaymentService uses this - never hardcodes which amount to credit.
 	 */
 	public Money getAmountToCredit() {
 		return (isFxPayment() && convertedAmount != null) ? convertedAmount : amount;

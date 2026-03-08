@@ -19,14 +19,14 @@ import lombok.extern.slf4j.Slf4j;
 /**
  * Enriches raw payment data with:
  * <p>
- * 1. Account context — fetched from Account Service REST API
+ * 1. Account context - fetched from Account Service REST API
  * (active/frozen status, age, balance, fraud history)
  * <p>
- * 2. User behavioral context — computed from local transaction history
+ * 2. User behavioral context - computed from local transaction history
  * (velocity: tx count per hour/day, total amounts, largest tx ever)
  * <p>
  * Caching:
- * - Account info cached for 5 minutes (Redis) — reduces Account Service load
+ * - Account info cached for 5 minutes (Redis) - reduces Account Service load
  * - Behavioral context is always fresh (computed from local DB)
  * <p>
  * Resilience:
@@ -96,7 +96,7 @@ public class PaymentContextEnricherImpl implements PaymentContextEnricher {
 					transactionHistoryRepository.hasFraudFlags(accountId)
 			);
 		} catch (Exception ex) {
-			log.warn("Could not fetch account context for {} — using minimal fallback: {}",
+			log.warn("Could not fetch account context for {} - using minimal fallback: {}",
 					accountId, ex.getMessage());
 			return minimalAccountContext(accountId);
 		}
@@ -128,7 +128,7 @@ public class PaymentContextEnricherImpl implements PaymentContextEnricher {
 					new String[]{}
 			);
 		} catch (Exception ex) {
-			log.warn("Could not compute behavioral context for user {} — using empty fallback: {}",
+			log.warn("Could not compute behavioral context for user {} - using empty fallback: {}",
 					userId, ex.getMessage());
 			return emptyBehavior(userId);
 		}

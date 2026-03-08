@@ -44,6 +44,6 @@ CREATE TABLE IF NOT EXISTS audit_log
 CREATE INDEX idx_audit_account_id ON audit_log (account_id);
 CREATE INDEX idx_audit_occurred_at ON audit_log (occurred_at DESC);
 
-COMMENT ON TABLE accounts IS 'Bank accounts — core aggregate storage';
-COMMENT ON TABLE audit_log IS 'Immutable audit trail — compliance requirement';
+COMMENT ON TABLE accounts IS 'Bank accounts - core aggregate storage';
+COMMENT ON TABLE audit_log IS 'Immutable audit trail - compliance requirement';
 COMMENT ON SEQUENCE iban_sequence IS 'Used to generate unique BBAN part of Polish IBANs';

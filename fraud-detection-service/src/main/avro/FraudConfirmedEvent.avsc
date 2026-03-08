@@ -31,7 +31,7 @@
     {
       "name": "notes",
       "type": "string",
-      "doc": "Compliance notes — stored for audit trail"
+      "doc": "Compliance notes - stored for audit trail"
     },
     {
       "name": "reversalRequired",

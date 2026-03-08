@@ -5,13 +5,13 @@ import java.util.Objects;
 import lombok.Getter;
 
 /**
- * Value Object — immutable currency pair (e.g. EUR/PLN, USD/PLN).
+ * Value Object - immutable currency pair (e.g. EUR/PLN, USD/PLN).
  * <p>
  * Canonical form: base/quote (ISO 4217).
- * Inverse pair is computed on demand — no separate storage needed.
+ * Inverse pair is computed on demand - no separate storage needed.
  * <p>
  * Design note: CurrencyPair is symmetric in business logic but NOT
- * in rate fetching — EUR/PLN rate is fetched from provider, PLN/EUR
+ * in rate fetching - EUR/PLN rate is fetched from provider, PLN/EUR
  * is its mathematical inverse. We always normalise to a provider-canonical
  * form (e.g. XXX/PLN) and invert when needed.
  */
@@ -62,7 +62,7 @@ public final class CurrencyPair {
 	}
 
 	/**
-	 * Returns "EURPLN" — used as Redis cache key
+	 * Returns "EURPLN" - used as Redis cache key
 	 */
 	public String getCacheKey() {
 		return base.getCode() + quote.getCode();

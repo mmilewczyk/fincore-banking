@@ -2,7 +2,7 @@
   "type": "record",
   "name": "FraudCaseEscalatedEvent",
   "namespace": "com.matcodem.fincore.fraud.avro",
-  "doc": "Published when a fraud case is escalated for manual review. Payment stays PENDING. Consumed by Payment Service (no-op — just acks) and Compliance Dashboard.",
+  "doc": "Published when a fraud case is escalated for manual review. Payment stays PENDING. Consumed by Payment Service (no-op - just acks) and Compliance Dashboard.",
   "fields": [
     {
       "name": "eventId",

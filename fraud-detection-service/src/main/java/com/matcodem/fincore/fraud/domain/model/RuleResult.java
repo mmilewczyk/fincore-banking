@@ -3,7 +3,7 @@ package com.matcodem.fincore.fraud.domain.model;
 import java.util.Objects;
 
 /**
- * Value Object — result of a single fraud rule evaluation.
+ * Value Object - result of a single fraud rule evaluation.
  * Immutable record of what a rule decided and why.
  */
 public record RuleResult(

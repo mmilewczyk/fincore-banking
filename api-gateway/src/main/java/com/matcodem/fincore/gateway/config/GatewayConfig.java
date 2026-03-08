@@ -8,16 +8,16 @@ import org.springframework.context.annotation.Configuration;
 import reactor.core.publisher.Mono;
 
 /**
- * Rate Limiter configuration — Redis-backed token bucket per user.
+ * Rate Limiter configuration - Redis-backed token bucket per user.
  * <p>
  * Strategy: per authenticated user (X-Auth-User-Id header).
  * Falls back to IP address for unauthenticated requests.
  * <p>
  * Default limits (configured in application.yml):
  * Global API:  100 req/s, burst 200
- * Payments:     20 req/s, burst 40   (stricter — financial operations)
+ * Payments:     20 req/s, burst 40   (stricter - financial operations)
  * <p>
- * When rate limit exceeded → 429 Too Many Requests
+ * When rate limit exceeded -> 429 Too Many Requests
  */
 @Configuration
 public class GatewayConfig {
@@ -42,7 +42,7 @@ public class GatewayConfig {
 	}
 
 	/**
-	 * Explicit Redis rate limiter bean — allows programmatic configuration
+	 * Explicit Redis rate limiter bean - allows programmatic configuration
 	 * in addition to application.yml.
 	 */
 	@Bean

@@ -83,7 +83,7 @@ public class AvroEventMapper {
 				.setAmount(e.amount().getAmount())
 				.setCurrency(toCurrency(e.amount().getCurrency()))
 				.setFraudReason(e.reason())
-				.setFraudScore(null) // score not available in domain event — populated by fraud service
+				.setFraudScore(null) // score not available in domain event - populated by fraud service
 				.setSchemaVersion(1)
 				.build();
 	}
@@ -103,7 +103,7 @@ public class AvroEventMapper {
 
 	/**
 	 * Extracts paymentId from any fraud event.
-	 * Payment Service only needs the paymentId to drive its own lifecycle —
+	 * Payment Service only needs the paymentId to drive its own lifecycle -
 	 * it doesn't need the full fraud event structure.
 	 */
 	public String extractPaymentId(com.matcodem.fincore.fraud.avro.FraudCaseApprovedEvent e) {

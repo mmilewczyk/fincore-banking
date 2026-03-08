@@ -47,7 +47,7 @@ public class KafkaFraudEventPublisher implements FraudEventPublisher {
 						meterRegistry.counter("fraud.publisher.error",
 								"eventType", event.eventType()).increment();
 					} else {
-						log.debug("Published Avro fraud event {} → {} offset={}",
+						log.debug("Published Avro fraud event {} -> {} offset={}",
 								event.eventType(), topic,
 								result.getRecordMetadata().offset());
 						meterRegistry.counter("fraud.publisher.success",
@@ -57,8 +57,8 @@ public class KafkaFraudEventPublisher implements FraudEventPublisher {
 	}
 
 	private String resolveTopic(DomainEvent event) {
-		// fraud.case.approved → fincore.fraud.case-approved
-		// fraud.confirmed     → fincore.fraud.confirmed
+		// fraud.case.approved -> fincore.fraud.case-approved
+		// fraud.confirmed     -> fincore.fraud.confirmed
 		return TOPIC_PREFIX + event.eventType().replace("fraud.", "").replace(".", "-");
 	}
 

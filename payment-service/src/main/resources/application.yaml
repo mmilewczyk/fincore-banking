@@ -23,7 +23,7 @@ spring:
     properties:
       hibernate:
         dialect: org.hibernate.dialect.PostgreSQLDialect
-        # Batch inserts — OutboxPoller writes many rows; batching reduces DB round-trips
+        # Batch inserts - OutboxPoller writes many rows; batching reduces DB round-trips
         jdbc.batch_size: 50
         order_inserts: true
         order_updates: true
@@ -37,7 +37,7 @@ spring:
     bootstrap-servers: localhost:9092
     producer:
       key-serializer: org.apache.kafka.common.serialization.StringSerializer
-      # Avro serializer — encodes messages as Confluent wire format:
+      # Avro serializer - encodes messages as Confluent wire format:
       # [magic byte 0x00][schema-id 4 bytes][avro payload]
       value-serializer: io.confluent.kafka.serializers.KafkaAvroSerializer
       acks: all
@@ -46,7 +46,7 @@ spring:
         enable.idempotence: true
         max.in.flight.requests.per.connection: 5
         delivery.timeout.ms: 120000
-        # Schema Registry — required by KafkaAvroSerializer
+        # Schema Registry - required by KafkaAvroSerializer
         schema.registry.url: ${kafka.schema-registry.url:http://localhost:8081}
         # auto.register.schemas: true in local dev, false in prod (overridden by env/profile)
         auto.register.schemas: true
@@ -89,7 +89,7 @@ server:
   port: 8082
   shutdown: graceful
   tomcat:
-    # Tuned for K8s — payment processing is I/O bound (Account Service, FX Service, DB)
+    # Tuned for K8s - payment processing is I/O bound (Account Service, FX Service, DB)
     threads:
       max: 50
       min-spare: 10
@@ -135,13 +135,13 @@ resilience4j:
           - java.net.SocketTimeoutException
           - org.springframework.web.reactive.function.client.WebClientRequestException
         ignoreExceptions:
-          # Don't retry business exceptions — they won't resolve on retry
+          # Don't retry business exceptions - they won't resolve on retry
           - java.lang.IllegalStateException
           - java.util.NoSuchElementException
       fx-service:
         maxAttempts: 2
         waitDuration: 1s
-        # FX rates are time-sensitive — fewer retries, faster fail
+        # FX rates are time-sensitive - fewer retries, faster fail
   timelimiter:
     instances:
       account-service:
@@ -174,7 +174,7 @@ management:
       application: payment-service  # Common label on all metrics for Grafana filtering
   tracing:
     sampling:
-      probability: 1.0    # 100% in dev — reduce to 0.1 in prod
+      probability: 1.0    # 100% in dev - reduce to 0.1 in prod
   otlp:
     tracing:
       endpoint: http://localhost:4318/v1/traces

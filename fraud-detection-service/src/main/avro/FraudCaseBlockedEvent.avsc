@@ -45,7 +45,7 @@
         "values": "int"
       },
       "default": {},
-      "doc": "Score per rule, e.g. {VelocityRule: 85, AmountRule: 20}. Added in v2 — empty map in older messages (BACKWARD compatible)."
+      "doc": "Score per rule, e.g. {VelocityRule: 85, AmountRule: 20}. Added in v2 - empty map in older messages (BACKWARD compatible)."
     },
     {
       "name": "schemaVersion",

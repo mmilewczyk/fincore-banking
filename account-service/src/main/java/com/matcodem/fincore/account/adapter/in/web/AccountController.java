@@ -111,10 +111,10 @@ public class AccountController {
 	}
 
 	/**
-	 * Debit account — called by Payment Service via internal REST.
+	 * Debit account - called by Payment Service via internal REST.
 	 * <p>
 	 * Security: ROLE_SERVICE (internal service-to-service token) or ROLE_ADMIN.
-	 * Not exposed directly to end users — only reachable within the K8s namespace.
+	 * Not exposed directly to end users - only reachable within the K8s namespace.
 	 * <p>
 	 * Idempotent: duplicate reference is silently accepted if the amount matches
 	 * (Account Service checks for reference uniqueness in its own domain).
@@ -126,7 +126,7 @@ public class AccountController {
 			@PathVariable String accountId,
 			@Valid @RequestBody BalanceOperationRequest request) {
 
-		log.info("Debit request — account: {}, amount: {} {}, ref: {}",
+		log.info("Debit request - account: {}, amount: {} {}, ref: {}",
 				accountId, request.amount(), request.currency(), request.reference());
 
 		updateAccountBalanceUseCase.debit(new UpdateAccountBalanceUseCase.DebitCommand(
@@ -139,7 +139,7 @@ public class AccountController {
 	}
 
 	/**
-	 * Credit account — called by Payment Service via internal REST.
+	 * Credit account - called by Payment Service via internal REST.
 	 */
 	@PostMapping("/{accountId}/credit")
 	@Timed(value = "account.credit")
@@ -148,7 +148,7 @@ public class AccountController {
 			@PathVariable String accountId,
 			@Valid @RequestBody BalanceOperationRequest request) {
 
-		log.info("Credit request — account: {}, amount: {} {}, ref: {}",
+		log.info("Credit request - account: {}, amount: {} {}, ref: {}",
 				accountId, request.amount(), request.currency(), request.reference());
 
 		updateAccountBalanceUseCase.credit(new UpdateAccountBalanceUseCase.CreditCommand(

@@ -6,8 +6,8 @@
 -- a redelivered "fraud.case.approved" event would debit/credit accounts twice.
 --
 -- Solution: Before processing any event, INSERT the event_id.
--- If it already exists (UNIQUE constraint) → silently skip.
--- INSERT ... ON CONFLICT DO NOTHING returns 0 rows affected → consumer skips.
+-- If it already exists (UNIQUE constraint) -> silently skip.
+-- INSERT ... ON CONFLICT DO NOTHING returns 0 rows affected -> consumer skips.
 --
 -- Retention: processed events older than 30 days are cleaned up by a scheduled job
 -- (ProcessedEventCleanupJob). 30 days is chosen to be longer than any realistic

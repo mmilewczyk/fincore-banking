@@ -6,7 +6,7 @@ import java.util.List;
 import com.matcodem.fincore.account.domain.model.AccountId;
 
 /**
- * Driven port — audit log persistence.
+ * Driven port - audit log persistence.
  * Every state change is recorded as an immutable audit entry.
  */
 public interface AuditLogRepository {

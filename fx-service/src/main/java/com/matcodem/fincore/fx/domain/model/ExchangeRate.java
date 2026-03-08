@@ -22,22 +22,22 @@ import com.matcodem.fincore.fx.domain.event.ExchangeRateSupersededEvent;
  * <p>
  * Key concepts:
  * <p>
- * MID RATE — raw market rate from external provider (e.g. ECB, Reuters).
+ * MID RATE - raw market rate from external provider (e.g. ECB, Reuters).
  * EUR/PLN = 4.2850 means 1 EUR = 4.2850 PLN.
  * <p>
- * SPREAD   — our bank's margin expressed in basis points (1 bp = 0.01%).
+ * SPREAD   - our bank's margin expressed in basis points (1 bp = 0.01%).
  * Applied symmetrically around mid: bid = mid*(1 - spread), ask = mid*(1 + spread).
- * e.g. mid=4.2850, spread=50bp → bid=4.2636, ask=4.3064
+ * e.g. mid=4.2850, spread=50bp -> bid=4.2636, ask=4.3064
  * <p>
- * BID RATE — rate at which bank BUYS base currency from customer (customer sells).
- * ASK RATE — rate at which bank SELLS base currency to customer (customer buys).
+ * BID RATE - rate at which bank BUYS base currency from customer (customer sells).
+ * ASK RATE - rate at which bank SELLS base currency to customer (customer buys).
  * <p>
- * STALE    — rates older than staleness threshold are flagged; conversions with
+ * STALE    - rates older than staleness threshold are flagged; conversions with
  * stale rates are rejected (configurable override for low-volume pairs).
  * <p>
  * LIFECYCLE:
- * ACTIVE → SUPERSEDED (when a newer rate replaces it)
- * ACTIVE → STALE      (when staleness threshold exceeded)
+ * ACTIVE -> SUPERSEDED (when a newer rate replaces it)
+ * ACTIVE -> STALE      (when staleness threshold exceeded)
  */
 public class ExchangeRate {
 
@@ -122,14 +122,14 @@ public class ExchangeRate {
 
 	/**
 	 * Converts an amount from base to quote currency using ask rate (bank sells base).
-	 * e.g. convert 100 EUR → PLN: result = 100 * askRate(EUR/PLN)
+	 * e.g. convert 100 EUR -> PLN: result = 100 * askRate(EUR/PLN)
 	 */
 	public ConversionResult convert(BigDecimal sourceAmount, ConversionDirection direction) {
 		assertActive();
 
 		BigDecimal rate = switch (direction) {
-			case BUY_BASE -> askRate;  // customer buys base (e.g. EUR) — bank sells at ask
-			case SELL_BASE -> bidRate;  // customer sells base — bank buys at bid
+			case BUY_BASE -> askRate;  // customer buys base (e.g. EUR) - bank sells at ask
+			case SELL_BASE -> bidRate;  // customer sells base - bank buys at bid
 		};
 
 		BigDecimal convertedAmount = sourceAmount.multiply(rate, MC)

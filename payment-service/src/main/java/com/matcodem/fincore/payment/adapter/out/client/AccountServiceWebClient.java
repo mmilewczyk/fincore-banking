@@ -15,7 +15,7 @@ import io.github.resilience4j.retry.annotation.Retry;
 import lombok.extern.slf4j.Slf4j;
 
 /**
- * REST adapter to Account Service — implements AccountServiceClient port.
+ * REST adapter to Account Service - implements AccountServiceClient port.
  * <p>
  * Uses the shared WebClient.Builder from InfrastructureConfig, which provides
  * Netty-level timeouts (connect 3s, read/write 5s). This prevents indefinite
@@ -23,15 +23,15 @@ import lombok.extern.slf4j.Slf4j;
  * <p>
  * Resilience4j:
  *
- * @CircuitBreaker — opens after 50% failure rate over sliding window of 10 calls.
+ * @CircuitBreaker - opens after 50% failure rate over sliding window of 10 calls.
  * OPEN state: calls fail-fast for 15s, no upstream requests sent.
- * @Retry — 3 attempts, 500ms exponential backoff, only on transient errors.
- * Does NOT retry on 4xx (account not found, insufficient funds) —
+ * @Retry - 3 attempts, 500ms exponential backoff, only on transient errors.
+ * Does NOT retry on 4xx (account not found, insufficient funds) -
  * those are non-retryable business errors.
  * <p>
  * HTTP 404 from Account Service is treated as AccountServiceUnavailableException
  * rather than NoSuchElementException because the payment-service should not silently
- * proceed with debit/credit if the account is unexpectedly missing — that's an
+ * proceed with debit/credit if the account is unexpectedly missing - that's an
  * infrastructure inconsistency, not a user error.
  */
 @Slf4j
@@ -51,7 +51,7 @@ public class AccountServiceWebClient implements AccountServiceClient {
 	@CircuitBreaker(name = "account-service", fallbackMethod = "debitFallback")
 	@Retry(name = "account-service")
 	public void debitAccount(String accountId, Money amount, String paymentReference) {
-		log.info("Debiting account {} — amount: {}, ref: {}", accountId, amount, paymentReference);
+		log.info("Debiting account {} - amount: {}, ref: {}", accountId, amount, paymentReference);
 
 		webClient.post()
 				.uri("/api/v1/accounts/{id}/debit", accountId)
@@ -65,14 +65,14 @@ public class AccountServiceWebClient implements AccountServiceClient {
 				.toBodilessEntity()
 				.block();
 
-		log.info("Debit OK — account: {}, ref: {}", accountId, paymentReference);
+		log.info("Debit OK - account: {}, ref: {}", accountId, paymentReference);
 	}
 
 	@Override
 	@CircuitBreaker(name = "account-service", fallbackMethod = "creditFallback")
 	@Retry(name = "account-service")
 	public void creditAccount(String accountId, Money amount, String paymentReference) {
-		log.info("Crediting account {} — amount: {}, ref: {}", accountId, amount, paymentReference);
+		log.info("Crediting account {} - amount: {}, ref: {}", accountId, amount, paymentReference);
 
 		webClient.post()
 				.uri("/api/v1/accounts/{id}/credit", accountId)
@@ -86,7 +86,7 @@ public class AccountServiceWebClient implements AccountServiceClient {
 				.toBodilessEntity()
 				.block();
 
-		log.info("Credit OK — account: {}, ref: {}", accountId, paymentReference);
+		log.info("Credit OK - account: {}, ref: {}", accountId, paymentReference);
 	}
 
 	@Override
@@ -113,17 +113,17 @@ public class AccountServiceWebClient implements AccountServiceClient {
 
 	private void debitFallback(String accountId, Money amount, String ref, Throwable ex) {
 		log.error("Account Service unavailable for debit on {}: {}", accountId, ex.getMessage());
-		throw new AccountServiceUnavailableException("Account Service unavailable — debit: " + accountId);
+		throw new AccountServiceUnavailableException("Account Service unavailable - debit: " + accountId);
 	}
 
 	private void creditFallback(String accountId, Money amount, String ref, Throwable ex) {
 		log.error("Account Service unavailable for credit on {}: {}", accountId, ex.getMessage());
-		throw new AccountServiceUnavailableException("Account Service unavailable — credit: " + accountId);
+		throw new AccountServiceUnavailableException("Account Service unavailable - credit: " + accountId);
 	}
 
 	private AccountInfo getAccountFallback(String accountId, Throwable ex) {
 		log.error("Account Service unavailable for getAccountInfo on {}: {}", accountId, ex.getMessage());
-		throw new AccountServiceUnavailableException("Account Service unavailable — get: " + accountId);
+		throw new AccountServiceUnavailableException("Account Service unavailable - get: " + accountId);
 	}
 
 	public static class AccountServiceUnavailableException extends RuntimeException {

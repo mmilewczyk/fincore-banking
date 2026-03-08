@@ -35,16 +35,16 @@ public class PaymentProcessor {
 
 	/**
 	 * Called while the distributed lock is held.
-	 * Opens its own @Transactional scope — the lock is acquired BEFORE the
+	 * Opens its own @Transactional scope - the lock is acquired BEFORE the
 	 * transaction opens, so the DB connection is not held during lock wait.
 	 */
 	@Transactional
 	public void executeUnderLock(String paymentId) {
-		// Re-fetch with fresh snapshot — mandatory to avoid acting on stale state
+		// Re-fetch with fresh snapshot - mandatory to avoid acting on stale state
 		// from before the lock was acquired (another instance may have raced us).
 		Payment payment = loadPayment(paymentId);
 		if (!payment.isPending()) {
-			log.warn("Payment {} already claimed ({}) — skipping under lock",
+			log.warn("Payment {} already claimed ({}) - skipping under lock",
 					paymentId, payment.getStatus());
 			return;
 		}
@@ -64,7 +64,7 @@ public class PaymentProcessor {
 					payment.getSourceAccountId(), payment.getAmount(), paymentId);
 
 			// For FX payments: credit convertedAmount (PLN), not the source-currency amount.
-			// getAmountToCredit() handles this transparently — returns convertedAmount for FX,
+			// getAmountToCredit() handles this transparently - returns convertedAmount for FX,
 			// original amount for all other payment types.
 			accountServiceClient.creditAccount(
 					payment.getTargetAccountId(), payment.getAmountToCredit(), paymentId);
@@ -76,7 +76,7 @@ public class PaymentProcessor {
 			log.info("Payment {} COMPLETED successfully", paymentId);
 
 		} catch (FxServiceWebClient.FxServiceUnavailableException ex) {
-			// FX failed before any money moved — clean failure, no compensation needed
+			// FX failed before any money moved - clean failure, no compensation needed
 			log.error("FX conversion failed for payment {}: {}", paymentId, ex.getMessage());
 			payment.fail("FX conversion unavailable: " + ex.getMessage());
 			saveAndPublish(payment);
@@ -84,8 +84,8 @@ public class PaymentProcessor {
 
 		} catch (AccountServiceWebClient.AccountServiceUnavailableException ex) {
 			// Debit OR credit failed. If debit succeeded and credit failed,
-			// money has moved — see class Javadoc for compensation strategy.
-			log.error("ACCOUNT SERVICE FAILED for payment {} — possible partial execution: {}",
+			// money has moved - see class Javadoc for compensation strategy.
+			log.error("ACCOUNT SERVICE FAILED for payment {} - possible partial execution: {}",
 					paymentId, ex.getMessage());
 			payment.fail("Account Service unavailable: " + ex.getMessage());
 			saveAndPublish(payment);
@@ -103,11 +103,11 @@ public class PaymentProcessor {
 	 * On success, calls payment.lockFxConversion() to record the result on the aggregate.
 	 * <p>
 	 * CRITICAL: After this method, payment.getAmountToCredit() returns the converted PLN amount.
-	 * creditAccount() MUST be called after this — it reads getAmountToCredit() transparently.
+	 * creditAccount() MUST be called after this - it reads getAmountToCredit() transparently.
 	 * <p>
 	 * If FX Service is unavailable (circuit breaker open or timeout):
-	 * FxServiceUnavailableException is thrown → caught in executeUnderLock() → payment.fail().
-	 * No money has moved at this point — clean failure, no compensation needed.
+	 * FxServiceUnavailableException is thrown -> caught in executeUnderLock() -> payment.fail().
+	 * No money has moved at this point - clean failure, no compensation needed.
 	 * <p>
 	 * Why "BUY_BASE"?
 	 * Customer is selling EUR (source) to buy PLN (target). In FX terminology:
@@ -117,7 +117,7 @@ public class PaymentProcessor {
 	private void performFxConversion(Payment payment) {
 		String paymentId = payment.getId().toString();
 		Money money = payment.getAmount();
-		// Pair: source currency → PLN (e.g. "EURPLN", "USDPLN")
+		// Pair: source currency -> PLN (e.g. "EURPLN", "USDPLN")
 		String pair = money.getCurrency().getCode() + "PLN";
 
 		FxServiceWebClient.FxConversionResult fx = fxServiceClient.convert(
@@ -129,11 +129,11 @@ public class PaymentProcessor {
 				"BUY_BASE"
 		);
 
-		log.info("FX locked for payment {} — {} {} → {} PLN @ {} (fee: {}, convId: {})",
+		log.info("FX locked for payment {} - {} {} -> {} PLN @ {} (fee: {}, convId: {})",
 				paymentId, money.getAmount(), money.getCurrency().getCode(),
 				fx.convertedAmount(), fx.appliedRate(), fx.fee(), fx.conversionId());
 
-		// Record FX result on the aggregate — this is what creditAccount() will use.
+		// Record FX result on the aggregate - this is what creditAccount() will use.
 		// convertedAmount is in PLN (target currency in all FinCore FX flows).
 		Money convertedAmountMoney = Money.of(fx.convertedAmount(), Currency.PLN);
 		payment.lockFxConversion(convertedAmountMoney, fx.conversionId());
@@ -141,10 +141,10 @@ public class PaymentProcessor {
 
 	/**
 	 * Persist the payment and flush all accumulated domain events to the outbox.
-	 * Called within an active @Transactional context — payment row + outbox rows
+	 * Called within an active @Transactional context - payment row + outbox rows
 	 * are written atomically.
 	 * <p>
-	 * Note: pullDomainEvents() clears the in-memory list — idempotent, safe to call
+	 * Note: pullDomainEvents() clears the in-memory list - idempotent, safe to call
 	 * multiple times (second call returns empty list).
 	 */
 	private void saveAndPublish(Payment payment) {

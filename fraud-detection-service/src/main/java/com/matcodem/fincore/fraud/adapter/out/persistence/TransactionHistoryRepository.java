@@ -9,15 +9,15 @@ import org.springframework.stereotype.Repository;
 import lombok.RequiredArgsConstructor;
 
 /**
- * Reads from a local transaction_history table — a denormalized projection
+ * Reads from a local transaction_history table - a denormalized projection
  * maintained by consuming account.credited / account.debited events from Kafka.
  * <p>
  * Why local copy and not call Account Service each time?
  * - Fraud analysis must be fast (< 200ms SLA)
- * - Account Service might be down — fraud analysis must still work
+ * - Account Service might be down - fraud analysis must still work
  * - Complex analytical queries (aggregates, time windows) are cheaper locally
  * <p>
- * This is the CQRS read model pattern — write side is in Account Service,
+ * This is the CQRS read model pattern - write side is in Account Service,
  * read side is a local projection optimized for fraud queries.
  */
 @Repository

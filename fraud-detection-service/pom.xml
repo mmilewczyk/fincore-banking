@@ -12,7 +12,7 @@
 
 	<artifactId>fraud-detection-service</artifactId>
 	<version>1.0.0-SNAPSHOT</version>
-	<description>Fraud Detection — ML-like rule engine, Kafka consumer, risk scoring</description>
+	<description>Fraud Detection - ML-like rule engine, Kafka consumer, risk scoring</description>
 
 	<properties>
 		<java.version>21</java.version>
@@ -106,7 +106,7 @@
 			   - avro (org.apache.avro)
 			   - confluent schema-registry-client
 			   - KafkaAvroSerializer / KafkaAvroDeserializer
-			 Do NOT add org.apache.avro:avro separately — version conflicts.
+			 Do NOT add org.apache.avro:avro separately - version conflicts.
 		-->
 		<dependency>
 			<groupId>io.confluent</groupId>
@@ -204,7 +204,7 @@
 		<!--
 			Testcontainers Schema Registry module.
 			Spins up a real confluentinc/cp-schema-registry container in integration tests.
-			Avoids mocking the registry — tests validate real schema registration/compatibility.
+			Avoids mocking the registry - tests validate real schema registration/compatibility.
 		-->
 		<dependency>
 			<groupId>io.confluent</groupId>
@@ -231,7 +231,7 @@
 			</plugin>
 
 			<!--
-				avro-maven-plugin — generates Java SpecificRecord classes from .avsc files.
+				avro-maven-plugin - generates Java SpecificRecord classes from .avsc files.
 
 				Execution order: generate-sources phase runs BEFORE compile.
 				Generated classes land in target/generated-sources/avro/ and are
@@ -264,7 +264,7 @@
 				<executions>
 					<!--
 						Second execution for fraud-service schemas.
-						Payment Service consumes fraud events — it needs fraud event classes
+						Payment Service consumes fraud events - it needs fraud event classes
 						locally for deserialization. In a real setup these would come from
 						a shared avro-schemas Maven module. Here we include them directly
 						to keep the portfolio self-contained without a multi-module build.

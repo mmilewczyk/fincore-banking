@@ -17,10 +17,10 @@ import com.matcodem.fincore.account.domain.event.DomainEvent;
  * <p>
  * Encapsulates all business rules around a bank account:
  * - Balance management (debit/credit)
- * - Status transitions (ACTIVE → FROZEN → CLOSED)
+ * - Status transitions (ACTIVE -> FROZEN -> CLOSED)
  * - Domain event recording for eventual consistency
  * <p>
- * No JPA annotations here — domain is infrastructure-agnostic.
+ * No JPA annotations here - domain is infrastructure-agnostic.
  */
 public class Account {
 
@@ -50,7 +50,7 @@ public class Account {
 	}
 
 	/**
-	 * Factory method — creates a new account and records domain event.
+	 * Factory method - creates a new account and records domain event.
 	 */
 	public static Account open(String ownerId, IBAN iban, Currency currency) {
 		Objects.requireNonNull(ownerId, "OwnerId cannot be null");
@@ -69,7 +69,7 @@ public class Account {
 	}
 
 	/**
-	 * Reconstitution from persistence — no events recorded.
+	 * Reconstitution from persistence - no events recorded.
 	 */
 	public static Account reconstitute(AccountId id, String ownerId, IBAN iban,
 	                                   Currency currency, Money balance, AccountStatus status,

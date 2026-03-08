@@ -7,7 +7,7 @@
     {
       "name": "eventId",
       "type": "string",
-      "doc": "UUID — unique per event, used for idempotency on the consumer side"
+      "doc": "UUID - unique per event, used for idempotency on the consumer side"
     },
     {
       "name": "occurredAt",
@@ -15,7 +15,7 @@
         "type": "long",
         "logicalType": "timestamp-millis"
       },
-      "doc": "Epoch milliseconds — when the event was created"
+      "doc": "Epoch milliseconds - when the event was created"
     },
     {
       "name": "paymentId",
@@ -43,7 +43,7 @@
         "precision": 19,
         "scale": 4
       },
-      "doc": "Payment amount — scale 4 to avoid floating-point errors (e.g. 100.0000)"
+      "doc": "Payment amount - scale 4 to avoid floating-point errors (e.g. 100.0000)"
     },
     {
       "name": "currency",
@@ -77,13 +77,13 @@
     {
       "name": "initiatedBy",
       "type": "string",
-      "doc": "Subject (userId) from JWT — who triggered this payment"
+      "doc": "Subject (userId) from JWT - who triggered this payment"
     },
     {
       "name": "schemaVersion",
       "type": "int",
       "default": 1,
-      "doc": "Schema version — increment when adding new fields. Allows consumers to handle multiple versions gracefully. BACKWARD compatibility: new consumers can read old messages (missing new fields use defaults)."
+      "doc": "Schema version - increment when adding new fields. Allows consumers to handle multiple versions gracefully. BACKWARD compatibility: new consumers can read old messages (missing new fields use defaults)."
     }
   ]
 }

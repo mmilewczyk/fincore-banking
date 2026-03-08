@@ -39,7 +39,7 @@
     {
       "name": "failureReason",
       "type": "string",
-      "doc": "Human-readable reason — NOT exposed to end users, for internal ops/alerting only"
+      "doc": "Human-readable reason - NOT exposed to end users, for internal ops/alerting only"
     },
     {
       "name": "failureCategory",
@@ -56,7 +56,7 @@
         ]
       },
       "default": "UNKNOWN",
-      "doc": "Machine-readable category — allows consumers to react differently (e.g. retry vs alert user)"
+      "doc": "Machine-readable category - allows consumers to react differently (e.g. retry vs alert user)"
     },
     {
       "name": "schemaVersion",

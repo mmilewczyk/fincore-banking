@@ -38,7 +38,7 @@ public class NewAccountRule implements FraudRule {
 								.formatted(amount, highAmountThreshold));
 			}
 			return RuleResult.trigger(getName(), 10,
-					"Source account is new (<30 days) — elevated risk");
+					"Source account is new (<30 days) - elevated risk");
 		}
 
 		if (target != null && target.isNew() && amount.compareTo(highAmountThreshold) > 0) {

@@ -14,7 +14,7 @@ import com.matcodem.fincore.fraud.domain.model.RuleResult;
  * Rule: Off-Hours Large Transaction.
  * <p>
  * Large transactions between midnight and 5 AM (local bank time)
- * have elevated fraud risk — humans rarely initiate large legitimate
+ * have elevated fraud risk - humans rarely initiate large legitimate
  * payments at 3 AM.
  * <p>
  * Score contribution: +15 points (weak signal, used in combination)

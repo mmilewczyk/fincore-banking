@@ -67,7 +67,7 @@ public class AvroAccountEventMapper {
 				.setOccurredAt(e.occurredAt())
 				.setAccountId(e.accountId().toString())
 				.setReason(e.reason())
-				.setFrozenBy(null)  // automated freeze — no human actor
+				.setFrozenBy(null)  // automated freeze - no human actor
 				.setSchemaVersion(1)
 				.build();
 	}

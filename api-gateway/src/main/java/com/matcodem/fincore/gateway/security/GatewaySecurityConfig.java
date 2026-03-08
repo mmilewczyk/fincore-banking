@@ -17,17 +17,17 @@ import org.springframework.web.cors.reactive.UrlBasedCorsConfigurationSource;
 import reactor.core.publisher.Flux;
 
 /**
- * Gateway-level security — single JWT validation point for all services.
+ * Gateway-level security - single JWT validation point for all services.
  * <p>
  * Downstream services still validate JWT (defence in depth),
  * but the Gateway is the first and main enforcement point.
  * <p>
  * Route-level authorization:
- * /api/v1/accounts/**    → ROLE_USER or ROLE_ADMIN
- * /api/v1/payments/**    → ROLE_USER or ROLE_ADMIN
- * /api/v1/fx/**          → ROLE_USER or ROLE_ADMIN
- * /api/v1/fraud/**       → ROLE_COMPLIANCE or ROLE_ADMIN only
- * /actuator/**           → internal only (blocked from external traffic)
+ * /api/v1/accounts/**    -> ROLE_USER or ROLE_ADMIN
+ * /api/v1/payments/**    -> ROLE_USER or ROLE_ADMIN
+ * /api/v1/fx/**          -> ROLE_USER or ROLE_ADMIN
+ * /api/v1/fraud/**       -> ROLE_COMPLIANCE or ROLE_ADMIN only
+ * /actuator/**           -> internal only (blocked from external traffic)
  * <p>
  * CORS: configured for the frontend domain.
  * All JWT claims (sub, roles) are forwarded to downstream services
@@ -46,11 +46,11 @@ public class GatewaySecurityConfig {
 						// Public health check
 						.pathMatchers("/actuator/health").permitAll()
 
-						// Fraud cases — compliance officers only
+						// Fraud cases - compliance officers only
 						.pathMatchers("/api/v1/fraud/**")
 						.hasAnyRole("COMPLIANCE", "ADMIN")
 
-						// All other API calls — authenticated users
+						// All other API calls - authenticated users
 						.pathMatchers("/api/v1/**")
 						.hasAnyRole("USER", "COMPLIANCE", "ADMIN")
 

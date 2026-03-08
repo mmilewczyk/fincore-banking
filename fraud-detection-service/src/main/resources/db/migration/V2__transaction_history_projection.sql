@@ -1,5 +1,5 @@
 -- V2__transaction_history_projection.sql
--- CQRS read model — local projection of account transactions
+-- CQRS read model - local projection of account transactions
 -- Maintained by TransactionHistoryProjector consuming Kafka events
 
 CREATE TABLE IF NOT EXISTS transaction_history
@@ -20,6 +20,6 @@ CREATE INDEX idx_tx_history_occurred_at ON transaction_history (account_id, occu
 CREATE INDEX idx_tx_history_currency ON transaction_history (account_id, currency);
 
 COMMENT ON TABLE transaction_history IS
-    'CQRS read model — denormalised projection of account transactions. ' ||
+    'CQRS read model - denormalised projection of account transactions. ' ||
     'Populated by consuming account.credited / account.debited Kafka events. ' ||
-    'Never write to this table directly — it is owned by the projector.';
+    'Never write to this table directly - it is owned by the projector.';

@@ -19,14 +19,14 @@ import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
 import lombok.extern.slf4j.Slf4j;
 
 /**
- * Fallback rate provider #2 — European Central Bank daily reference rates.
+ * Fallback rate provider #2 - European Central Bank daily reference rates.
  * <p>
  * ECB publishes rates daily at ~16:00 CET for ~30 currency pairs vs EUR.
  * Free, no API key required, highly reliable.
  * <p>
  * XML endpoint: https://www.ecb.europa.eu/stats/eurofxref/eurofxref-daily.xml
  * <p>
- * NOTE: ECB only publishes EUR-based rates — pairs like USD/PLN are computed
+ * NOTE: ECB only publishes EUR-based rates - pairs like USD/PLN are computed
  * as cross rates: USD/PLN = (1/EUR/USD) * (EUR/PLN)
  */
 @Slf4j
@@ -50,7 +50,7 @@ public class EcbRateClient implements RateProviderClient {
 	public Optional<RateQuote> fetchRate(CurrencyPair pair) {
 		// ECB only has EUR-based rates
 		if (pair.getBase() != Currency.EUR && pair.getQuote() != Currency.EUR) {
-			return Optional.empty(); // cross rate — not directly available
+			return Optional.empty(); // cross rate - not directly available
 		}
 
 		Map<CurrencyPair, RateQuote> allRates = fetchAllRates();

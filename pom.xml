@@ -7,7 +7,7 @@
 	<parent>
 		<groupId>org.springframework.boot</groupId>
 		<artifactId>spring-boot-starter-parent</artifactId>
-		<version>3.2.4</version>
+		<version>4.0.3</version>
 		<relativePath/>
 	</parent>
 
@@ -15,18 +15,291 @@
 	<artifactId>fincore</artifactId>
 	<version>1.0-SNAPSHOT</version>
 	<packaging>pom</packaging>
+	<description>FinCore Banking Platform - multi-microservice parent POM</description>
+
 	<modules>
 		<module>account-service</module>
 		<module>payment-service</module>
 		<module>fraud-detection-service</module>
 		<module>fx-service</module>
 		<module>api-gateway</module>
+		<module>notification-service</module>
 	</modules>
 
 	<properties>
-		<maven.compiler.source>21</maven.compiler.source>
-		<maven.compiler.target>21</maven.compiler.target>
+		<java.version>25</java.version>
+		<maven.compiler.source>25</maven.compiler.source>
+		<maven.compiler.target>25</maven.compiler.target>
 		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+
+		<!--
+		─── MIGRATION NOTES: Spring Boot 3.x -> 4.x ──────────────────────────
+		Boot 4 / Spring Framework 7 breaking changes relevant to FinCore:
+
+		1. JAKARTA EE 11
+		   No code changes needed - we already migrated javax -> jakarta in Boot 3.x.
+		   New baseline: Servlet 6.1, JPA 3.2, Bean Validation 3.1.
+
+		2. JACKSON 3
+		   Package relocated: com.fasterxml.jackson -> tools.jackson
+		   Default ObjectMapper replaced by JsonMapper (immutable).
+		   SORT_PROPERTIES_ALPHABETICALLY=true by default - may affect JSON test assertions.
+		   MapperFeature.DEFAULT_VIEW_INCLUSION=false by default.
+		   If a service uses Jackson 2 explicitly, add jackson-databind-2 compat dep.
+		   Boot 4 ships Jackson 3 but Jackson 2 can coexist as deprecated fallback.
+
+		3. TESTCONTAINERS 2.0
+		   Module artifact rename: org.testcontainers:postgresql -> org.testcontainers:testcontainers-postgresql
+		   Class package rename: org.testcontainers.containers.PostgreSQLContainer
+							   -> org.testcontainers.postgresql.PostgreSQLContainer
+		   Same pattern for kafka, junit-jupiter, redis.
+		   Boot 4 manages Testcontainers 2.x via its BOM - versions below are 2.x.
+
+		4. RESILIENCE4J
+		   resilience4j-spring-boot3 artifact renamed to resilience4j-spring-boot.
+		   Version 2.x is compatible with Boot 4. No API breaking changes.
+		   Built-in retry in Spring Framework 7 (@Retryable) is an alternative
+		   for simple use cases, but Resilience4j is retained for circuit breaker + bulkhead.
+
+		5. VIRTUAL THREADS (Java 21+, enhanced in Java 25)
+		   Enable with: spring.threads.virtual.enabled=true in application.yml
+		   Eliminates need for large Tomcat thread pools - set threads.max to a lower
+		   value (e.g. 50 -> 10 platform threads, virtual threads handle the rest).
+		   HikariCP: set maximumPoolSize conservatively - virtual threads don't help
+		   with DB connection limits; 10-20 is usually sufficient.
+
+		6. SPRING CLOUD (api-gateway)
+		   Spring Cloud 2025.0.x is required for Boot 4 compatibility.
+		   spring-cloud.version updated accordingly in api-gateway/pom.xml.
+		-->
+
+		<!-- Avro + Confluent Schema Registry -->
+		<avro.version>1.12.0</avro.version>
+		<confluent.version>8.1.1</confluent.version>
+
+		<!-- Testing -->
+		<!--
+		Testcontainers 2.0 ships with Spring Boot 4's BOM.
+		The version here is explicit to make it visible - Boot 4 manages it.
+		Artifact names changed: org.testcontainers:testcontainers-postgresql (note prefix).
+		-->
+		<testcontainers.version>2.0.3</testcontainers.version>
+		<wiremock.version>3.13.0</wiremock.version>
+
+		<!-- Resilience -->
+		<resilience4j.version>2.3.0</resilience4j.version>
+
+		<!-- Mapping -->
+		<mapstruct.version>1.6.3</mapstruct.version>
+
+		<!-- Locking -->
+		<redisson.version>3.43.0</redisson.version>
+
+		<!-- Notification providers -->
+		<firebase-admin.version>9.4.2</firebase-admin.version>
+		<twilio.version>10.6.4</twilio.version>
 	</properties>
+
+	<repositories>
+		<repository>
+			<id>central</id>
+			<name>Maven Central</name>
+			<url>https://repo.maven.apache.org/maven2</url>
+		</repository>
+		<repository>
+			<id>confluent</id>
+			<url>https://packages.confluent.io/maven/</url>
+			<releases>
+				<enabled>true</enabled>
+			</releases>
+			<snapshots>
+				<enabled>false</enabled>
+			</snapshots>
+		</repository>
+	</repositories>
+
+	<pluginRepositories>
+		<pluginRepository>
+			<id>central</id>
+			<url>https://repo.maven.apache.org/maven2</url>
+		</pluginRepository>
+		<pluginRepository>
+			<id>confluent</id>
+			<url>https://packages.confluent.io/maven/</url>
+		</pluginRepository>
+	</pluginRepositories>
+
+	<dependencyManagement>
+		<dependencies>
+
+			<!-- ── Avro + Schema Registry ──────────────────────────────────── -->
+			<dependency>
+				<groupId>org.apache.avro</groupId>
+				<artifactId>avro</artifactId>
+				<version>${avro.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>io.confluent</groupId>
+				<artifactId>kafka-avro-serializer</artifactId>
+				<version>${confluent.version}</version>
+				<exclusions>
+					<exclusion>
+						<groupId>org.apache.kafka</groupId>
+						<artifactId>kafka-clients</artifactId>
+					</exclusion>
+				</exclusions>
+			</dependency>
+			<dependency>
+				<groupId>io.confluent</groupId>
+				<artifactId>kafka-schema-registry-client</artifactId>
+				<version>${confluent.version}</version>
+			</dependency>
+
+			<!-- ── Resilience4j ────────────────────────────────────────────── -->
+			<dependency>
+				<groupId>io.github.resilience4j</groupId>
+				<artifactId>resilience4j-spring-boot3</artifactId>
+				<version>${resilience4j.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>io.github.resilience4j</groupId>
+				<artifactId>resilience4j-reactor</artifactId>
+				<version>${resilience4j.version}</version>
+			</dependency>
+
+			<!-- ── Redisson ────────────────────────────────────────────────── -->
+			<dependency>
+				<groupId>org.redisson</groupId>
+				<artifactId>redisson-spring-boot-starter</artifactId>
+				<version>${redisson.version}</version>
+			</dependency>
+
+			<!-- ── MapStruct ───────────────────────────────────────────────── -->
+			<dependency>
+				<groupId>org.mapstruct</groupId>
+				<artifactId>mapstruct</artifactId>
+				<version>${mapstruct.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>org.mapstruct</groupId>
+				<artifactId>mapstruct-processor</artifactId>
+				<version>${mapstruct.version}</version>
+			</dependency>
+
+			<!-- ── Notification providers ─────────────────────────────────── -->
+			<dependency>
+				<groupId>com.google.firebase</groupId>
+				<artifactId>firebase-admin</artifactId>
+				<version>${firebase-admin.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>com.twilio.sdk</groupId>
+				<artifactId>twilio</artifactId>
+				<version>${twilio.version}</version>
+			</dependency>
+
+			<!-- ── Testcontainers BOM ──────────────────────────────────────── -->
+			<!--
+			Testcontainers 2.0 breaking changes:
+			  - Artifact prefix added: postgresql -> testcontainers-postgresql
+			  - Class relocation: org.testcontainers.containers.PostgreSQLContainer
+								-> org.testcontainers.postgresql.PostgreSQLContainer
+			The BOM covers all renamed modules automatically once imported here.
+			Child poms must update <artifactId> to use the new prefixed names.
+			-->
+			<dependency>
+				<groupId>org.testcontainers</groupId>
+				<artifactId>testcontainers-bom</artifactId>
+				<version>${testcontainers.version}</version>
+				<type>pom</type>
+				<scope>import</scope>
+			</dependency>
+
+			<!-- ── WireMock ────────────────────────────────────────────────── -->
+			<dependency>
+				<groupId>org.wiremock</groupId>
+				<artifactId>wiremock-standalone</artifactId>
+				<version>${wiremock.version}</version>
+			</dependency>
+
+		</dependencies>
+	</dependencyManagement>
+
+	<build>
+		<pluginManagement>
+			<plugins>
+
+				<plugin>
+					<groupId>org.apache.avro</groupId>
+					<artifactId>avro-maven-plugin</artifactId>
+					<version>${avro.version}</version>
+					<configuration>
+						<stringType>String</stringType>
+						<enableDecimalLogicalType>true</enableDecimalLogicalType>
+						<fieldVisibility>PRIVATE</fieldVisibility>
+						<createSetters>false</createSetters>
+					</configuration>
+				</plugin>
+
+				<plugin>
+					<groupId>org.apache.maven.plugins</groupId>
+					<artifactId>maven-compiler-plugin</artifactId>
+					<configuration>
+						<source>${java.version}</source>
+						<target>${java.version}</target>
+						<parameters>true</parameters>
+						<compilerArgs>
+							<arg>--enable-preview</arg>
+						</compilerArgs>
+					</configuration>
+				</plugin>
+
+				<plugin>
+					<groupId>org.apache.maven.plugins</groupId>
+					<artifactId>maven-surefire-plugin</artifactId>
+					<configuration>
+						<excludedGroups>integration</excludedGroups>
+						<argLine>
+							--add-opens java.base/java.lang=ALL-UNNAMED
+							--add-opens java.base/java.util=ALL-UNNAMED
+						</argLine>
+					</configuration>
+				</plugin>
+
+				<plugin>
+					<groupId>org.apache.maven.plugins</groupId>
+					<artifactId>maven-failsafe-plugin</artifactId>
+					<configuration>
+						<groups>integration</groups>
+						<includes>
+							<include>**/*IntegrationTest.java</include>
+						</includes>
+					</configuration>
+					<executions>
+						<execution>
+							<goals>
+								<goal>integration-test</goal>
+								<goal>verify</goal>
+							</goals>
+						</execution>
+					</executions>
+				</plugin>
+
+				<plugin>
+					<groupId>org.springframework.boot</groupId>
+					<artifactId>spring-boot-maven-plugin</artifactId>
+					<configuration>
+						<excludes>
+							<exclude>
+								<groupId>org.projectlombok</groupId>
+								<artifactId>lombok</artifactId>
+							</exclude>
+						</excludes>
+					</configuration>
+				</plugin>
+
+			</plugins>
+		</pluginManagement>
+	</build>
 
 </project>

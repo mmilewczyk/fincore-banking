@@ -27,19 +27,19 @@ import lombok.extern.slf4j.Slf4j;
  * <p>
  * GetRate:
  * 1. Check Redis cache first (O(1), < 1ms)
- * 2. If cache miss → check DB for active rate
- * 3. If DB miss or stale → trigger live fetch via RateRefreshService (provider fallback chain)
+ * 2. If cache miss -> check DB for active rate
+ * 3. If DB miss or stale -> trigger live fetch via RateRefreshService (provider fallback chain)
  * 4. Return rate or throw RateUnavailableException
  * <p>
  * Convert:
  * 1. Get active rate (above flow)
  * 2. Delegate conversion math to ExchangeRate.convert() (pure domain logic)
  * 3. Persist FxConversion as immutable audit record
- * 4. Publish FxConversionExecutedEvent → Payment Service can proceed
+ * 4. Publish FxConversionExecutedEvent -> Payment Service can proceed
  * <p>
  * On stale/missing rate:
  * - Persist FxConversion.failed() with reason
- * - Publish FxConversionFailedEvent → Payment Service fails the payment
+ * - Publish FxConversionFailedEvent -> Payment Service fails the payment
  */
 @Slf4j
 @Service
@@ -77,11 +77,11 @@ public class FxApplicationService implements GetExchangeRateUseCase, ConvertCurr
 		}
 
 		meterRegistry.counter("fx.rate.cache.miss", "pair", pair.getSymbol()).increment();
-		log.info("Rate cache miss for {} — fetching from provider", pair);
+		log.info("Rate cache miss for {} - fetching from provider", pair);
 
 		return rateRefreshService.refreshRate(pair)
 				.orElseThrow(() -> new RateUnavailableException(
-						"All rate providers failed for " + pair + " — conversion rejected"
+						"All rate providers failed for " + pair + " - conversion rejected"
 				));
 	}
 
@@ -106,7 +106,7 @@ public class FxApplicationService implements GetExchangeRateUseCase, ConvertCurr
 			meterRegistry.counter("fx.conversion.success",
 					"pair", command.pair().getSymbol()).increment();
 
-			log.info("FX conversion executed: {} {} → {} {} (rate: {}, fee: {})",
+			log.info("FX conversion executed: {} {} -> {} {} (rate: {}, fee: {})",
 					command.sourceAmount(), command.pair().getBase(),
 					saved.getConvertedAmount(), command.pair().getQuote(),
 					saved.getAppliedRate(), saved.getFee());
@@ -114,7 +114,7 @@ public class FxApplicationService implements GetExchangeRateUseCase, ConvertCurr
 			return saved;
 
 		} catch (ExchangeRate.StaleRateException | RateUnavailableException ex) {
-			log.error("FX conversion failed for payment {} — {}", command.paymentId(), ex.getMessage());
+			log.error("FX conversion failed for payment {} - {}", command.paymentId(), ex.getMessage());
 
 			FxConversion failed = FxConversion.failed(
 					command.paymentId(), command.accountId(), command.requestedBy(),

@@ -17,7 +17,7 @@ import com.matcodem.fincore.fx.domain.port.out.RateProviderClient;
 import lombok.extern.slf4j.Slf4j;
 
 /**
- * Domain Service — Rate Refresh with Provider Fallback Chain.
+ * Domain Service - Rate Refresh with Provider Fallback Chain.
  * <p>
  * Provider priority (configured via getOrder()):
  * 1. ExchangeRatesApiClient (real-time, paid)
@@ -25,11 +25,11 @@ import lombok.extern.slf4j.Slf4j;
  * 3. NbpRateClient          (daily, free, PLN-only)
  * <p>
  * On each refresh attempt:
- * - Try provider 1 → if circuit breaker open or exception, try provider 2 → provider 3
+ * - Try provider 1 -> if circuit breaker open or exception, try provider 2 -> provider 3
  * - If all fail, the current cached rate remains active until it goes stale
  * - Stale rates cause conversions to fail with StaleRateException
  * <p>
- * Pure domain service — no Spring annotations.
+ * Pure domain service - no Spring annotations.
  * Circuit breaker is applied at the infrastructure/adapter layer via @CircuitBreaker.
  */
 @Slf4j
@@ -60,7 +60,7 @@ public class RateRefreshService {
 	}
 
 	/**
-	 * Refresh rate for a single pair — tries providers in priority order.
+	 * Refresh rate for a single pair - tries providers in priority order.
 	 * Returns the new ExchangeRate, or empty if all providers fail.
 	 */
 	public Optional<ExchangeRate> refreshRate(CurrencyPair pair) {
@@ -74,17 +74,17 @@ public class RateRefreshService {
 					return Optional.of(rate);
 				}
 			} catch (Exception ex) {
-				log.warn("Provider {} failed for pair {}: {} — trying next",
+				log.warn("Provider {} failed for pair {}: {} - trying next",
 						provider.getProviderName(), pair, ex.getMessage());
 			}
 		}
 
-		log.error("All providers failed to fetch rate for {} — retaining existing rate", pair);
+		log.error("All providers failed to fetch rate for {} - retaining existing rate", pair);
 		return Optional.empty();
 	}
 
 	/**
-	 * Bulk refresh — fetches all pairs from highest-priority provider,
+	 * Bulk refresh - fetches all pairs from highest-priority provider,
 	 * falls back per-pair for any gaps.
 	 */
 	public int refreshAllRates() {
@@ -97,10 +97,10 @@ public class RateRefreshService {
 					storeNewRate(entry.getKey(), entry.getValue());
 					refreshed++;
 				}
-				log.info("Bulk refresh from {} — {} pairs updated", provider.getProviderName(), allQuotes.size());
-				return refreshed; // success — no need to try further providers
+				log.info("Bulk refresh from {} - {} pairs updated", provider.getProviderName(), allQuotes.size());
+				return refreshed; // success - no need to try further providers
 			} catch (Exception ex) {
-				log.warn("Bulk refresh from {} failed: {} — trying next provider",
+				log.warn("Bulk refresh from {} failed: {} - trying next provider",
 						provider.getProviderName(), ex.getMessage());
 			}
 		}

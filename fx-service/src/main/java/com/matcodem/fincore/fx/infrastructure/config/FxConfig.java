@@ -50,7 +50,7 @@ public class FxConfig {
 	}
 
 	/**
-	 * Scheduled rate refresh — runs every 5 minutes.
+	 * Scheduled rate refresh - runs every 5 minutes.
 	 * Fetches from highest-priority provider, falls back automatically.
 	 */
 	@Bean
@@ -75,7 +75,7 @@ public class FxConfig {
 					Duration.ofMillis(elapsed)
 			);
 
-			log.info("Rate refresh complete — {} pairs updated in {}ms", count, elapsed);
+			log.info("Rate refresh complete - {} pairs updated in {}ms", count, elapsed);
 		}
 	}
 }

@@ -15,10 +15,10 @@ import lombok.extern.slf4j.Slf4j;
 import reactor.core.publisher.Mono;
 
 /**
- * Global filter — structured request/response logging.
+ * Global filter - structured request/response logging.
  * <p>
  * Logs every request with:
- * - Method, path, query params (sanitized — no auth tokens)
+ * - Method, path, query params (sanitized - no auth tokens)
  * - User ID (from X-Auth-User-Id header, added by JwtForwardingFilter)
  * - Response status
  * - Latency in ms
@@ -43,7 +43,7 @@ public class RequestLoggingFilter implements GlobalFilter, Ordered {
 		String userId = request.getHeaders().getFirst("X-Auth-User-Id");
 		String traceId = request.getHeaders().getFirst("X-B3-TraceId");
 
-		log.info("→ REQUEST  [{}] {} {} | userId: {} | traceId: {}",
+		log.info("-> REQUEST  [{}] {} {} | userId: {} | traceId: {}",
 				requestId, method, path, userId, traceId);
 
 		return chain.filter(exchange)
@@ -54,13 +54,13 @@ public class RequestLoggingFilter implements GlobalFilter, Ordered {
 					long latencyMs = Duration.between(startTime, Instant.now()).toMillis();
 
 					if (statusCode >= 500) {
-						log.error("← RESPONSE [{}] {} {} → {} | {}ms | userId: {}",
+						log.error("<- RESPONSE [{}] {} {} -> {} | {}ms | userId: {}",
 								requestId, method, path, statusCode, latencyMs, userId);
 					} else if (statusCode >= 400) {
-						log.warn("← RESPONSE [{}] {} {} → {} | {}ms | userId: {}",
+						log.warn("<- RESPONSE [{}] {} {} -> {} | {}ms | userId: {}",
 								requestId, method, path, statusCode, latencyMs, userId);
 					} else {
-						log.info("← RESPONSE [{}] {} {} → {} | {}ms | userId: {}",
+						log.info("<- RESPONSE [{}] {} {} -> {} | {}ms | userId: {}",
 								requestId, method, path, statusCode, latencyMs, userId);
 					}
 				});

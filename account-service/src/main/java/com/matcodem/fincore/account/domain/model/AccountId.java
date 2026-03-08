@@ -4,7 +4,7 @@ import java.util.Objects;
 import java.util.UUID;
 
 /**
- * Value Object — strongly-typed Account identifier.
+ * Value Object - strongly-typed Account identifier.
  * Prevents passing raw UUIDs where AccountId is expected.
  */
 public record AccountId(UUID value) {

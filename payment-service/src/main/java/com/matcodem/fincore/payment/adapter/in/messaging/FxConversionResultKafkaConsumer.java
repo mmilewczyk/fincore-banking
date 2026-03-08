@@ -19,15 +19,15 @@ import lombok.extern.slf4j.Slf4j;
  * Handles FX conversion failure events from FX Service.
  * <p>
  * NORMAL FLOW:
- * FX conversion is called SYNCHRONOUSLY within processPayment() — we need
+ * FX conversion is called SYNCHRONOUSLY within processPayment() - we need
  * the converted amount immediately before debiting/crediting accounts.
  * FxServiceWebClient.convert() blocks until the FX Service responds.
  * <p>
  * THIS CONSUMER handles the async edge case:
- * fincore.fx.conversion-failed — FX Service published a failure event
+ * fincore.fx.conversion-failed - FX Service published a failure event
  * (provider timeout, rate unavailable) for a conversion that was initiated
  * outside the normal synchronous flow (e.g. retry jobs, batch processing).
- * → Payment Service marks the payment FAILED.
+ * -> Payment Service marks the payment FAILED.
  */
 @Slf4j
 @Component
@@ -61,7 +61,7 @@ public class FxConversionResultKafkaConsumer {
 			String reason = (String) event.getOrDefault("reason", "FX conversion failed");
 			String pair = (String) event.getOrDefault("pair", "unknown");
 
-			log.error("FX conversion FAILED for payment {} — pair: {}, reason: {}",
+			log.error("FX conversion FAILED for payment {} - pair: {}, reason: {}",
 					paymentId, pair, reason);
 
 			processPaymentUseCase.failPayment(paymentId,

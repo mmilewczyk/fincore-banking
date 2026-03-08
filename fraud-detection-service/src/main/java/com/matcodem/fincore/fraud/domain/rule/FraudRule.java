@@ -9,7 +9,7 @@ import com.matcodem.fincore.fraud.domain.model.RuleResult;
  * <p>
  * Design principles:
  * - Each rule is responsible for ONE specific fraud signal
- * - Rules are independent — no shared mutable state
+ * - Rules are independent - no shared mutable state
  * - Rules are ordered by priority (cheaper/faster rules first)
  * - Rules can be enabled/disabled per environment via configuration
  */
@@ -28,7 +28,7 @@ public interface FraudRule {
 	String getName();
 
 	/**
-	 * Execution order — lower = evaluated first.
+	 * Execution order - lower = evaluated first.
 	 * Fast/cheap rules should run before slow/expensive ones.
 	 */
 	int getOrder();

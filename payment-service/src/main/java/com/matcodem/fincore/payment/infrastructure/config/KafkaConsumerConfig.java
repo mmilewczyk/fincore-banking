@@ -45,13 +45,13 @@ public class KafkaConsumerConfig {
 		props.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, ErrorHandlingDeserializer.class);
 		props.put(ErrorHandlingDeserializer.KEY_DESERIALIZER_CLASS, StringDeserializer.class);
 
-		// Value: Avro — wrapped in ErrorHandlingDeserializer for poison pill protection.
+		// Value: Avro - wrapped in ErrorHandlingDeserializer for poison pill protection.
 		// If a message cannot be deserialized (corrupted bytes, wrong schema, unknown schema ID),
 		// ErrorHandlingDeserializer catches the exception and the DefaultErrorHandler routes to DLT.
 		props.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, ErrorHandlingDeserializer.class);
 		props.put(ErrorHandlingDeserializer.VALUE_DESERIALIZER_CLASS, KafkaAvroDeserializer.class);
 
-		// Schema Registry connection — required by KafkaAvroDeserializer
+		// Schema Registry connection - required by KafkaAvroDeserializer
 		props.put(AbstractKafkaSchemaSerDeConfig.SCHEMA_REGISTRY_URL_CONFIG, schemaRegistryUrl);
 
 		// specific.avro.reader=true: return generated SpecificRecord subclass (type-safe).
@@ -77,7 +77,7 @@ public class KafkaConsumerConfig {
 		errorHandler.addNotRetryableExceptions(
 				IllegalArgumentException.class,
 				IllegalStateException.class,
-				// ClassCastException = wrong Avro type delivered on wrong topic → poison pill → DLT
+				// ClassCastException = wrong Avro type delivered on wrong topic -> poison pill -> DLT
 				ClassCastException.class
 		);
 

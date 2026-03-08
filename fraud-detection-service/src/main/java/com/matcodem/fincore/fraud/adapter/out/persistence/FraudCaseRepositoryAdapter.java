@@ -15,7 +15,7 @@ import com.matcodem.fincore.fraud.infrastructure.persistence.repository.FraudCas
 import lombok.RequiredArgsConstructor;
 
 /**
- * Adapter — implements domain FraudCaseRepository port using Spring Data JPA.
+ * Adapter - implements domain FraudCaseRepository port using Spring Data JPA.
  */
 @Component
 @RequiredArgsConstructor

@@ -14,7 +14,7 @@ import com.matcodem.fincore.payment.infrastructure.persistence.entity.OutboxMess
 public interface OutboxJpaRepository extends JpaRepository<OutboxMessageJpaEntity, UUID> {
 
 	/**
-	 * SELECT FOR UPDATE SKIP LOCKED — critical for multi-instance deployments.
+	 * SELECT FOR UPDATE SKIP LOCKED - critical for multi-instance deployments.
 	 * <p>
 	 * - FOR UPDATE: locks the rows being read
 	 * - SKIP LOCKED: skips rows already locked by other instances

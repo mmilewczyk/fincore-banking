@@ -8,7 +8,7 @@ import java.util.Optional;
 import com.matcodem.fincore.fx.domain.model.CurrencyPair;
 
 /**
- * Driven port — fetches live rates from an external provider.
+ * Driven port - fetches live rates from an external provider.
  * Implementations: ExchangeRatesApiClient, EcbRateClient, NbpRateClient.
  * Wrapped in circuit breaker + fallback chain at application layer.
  */
@@ -21,7 +21,7 @@ public interface RateProviderClient {
 	Optional<RateQuote> fetchRate(CurrencyPair pair);
 
 	/**
-	 * Fetch all supported rates in bulk — more efficient than per-pair calls.
+	 * Fetch all supported rates in bulk - more efficient than per-pair calls.
 	 */
 	Map<CurrencyPair, RateQuote> fetchAllRates();
 

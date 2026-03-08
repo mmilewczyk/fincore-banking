@@ -14,7 +14,7 @@ public record PaymentId(UUID value) {
 	}
 
 	/**
-	 * Accepts UUID string or plain UUID — used from web layer and Kafka consumers.
+	 * Accepts UUID string or plain UUID - used from web layer and Kafka consumers.
 	 */
 	public static PaymentId of(String value) {
 		try {

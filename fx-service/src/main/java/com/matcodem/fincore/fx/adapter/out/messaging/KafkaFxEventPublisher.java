@@ -17,9 +17,9 @@ import lombok.extern.slf4j.Slf4j;
  * Publishes FX domain events to Kafka as Avro messages.
  * <p>
  * Topic naming:
- * fx.rate.published       → fincore.fx.rate-published
- * fx.conversion.executed  → fincore.fx.conversion-executed
- * fx.conversion.failed    → fincore.fx.conversion-failed
+ * fx.rate.published       -> fincore.fx.rate-published
+ * fx.conversion.executed  -> fincore.fx.conversion-executed
+ * fx.conversion.failed    -> fincore.fx.conversion-failed
  */
 @Slf4j
 @Component
@@ -47,7 +47,7 @@ public class KafkaFxEventPublisher implements FxEventPublisher {
 						log.error("Failed to publish FX Avro event {} to {}: {}",
 								event.eventType(), topic, ex.getMessage());
 					} else {
-						log.debug("Published FX Avro event {} → {} offset={}",
+						log.debug("Published FX Avro event {} -> {} offset={}",
 								event.eventType(), topic,
 								result.getRecordMetadata().offset());
 					}

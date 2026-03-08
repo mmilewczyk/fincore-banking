@@ -1,4 +1,4 @@
--- V1__initial_schema.sql — Payment Service
+-- V1__initial_schema.sql - Payment Service
 
 CREATE TABLE IF NOT EXISTS payments
 (
@@ -54,6 +54,6 @@ CREATE INDEX idx_outbox_status ON outbox_messages (status) WHERE status = 'PENDI
 CREATE INDEX idx_outbox_aggregate ON outbox_messages (aggregate_id);
 CREATE INDEX idx_outbox_created_at ON outbox_messages (created_at ASC) WHERE status = 'PENDING';
 
-COMMENT ON TABLE payments IS 'Payment aggregates — core domain';
-COMMENT ON TABLE outbox_messages IS 'Transactional outbox — guarantees Kafka delivery';
+COMMENT ON TABLE payments IS 'Payment aggregates - core domain';
+COMMENT ON TABLE outbox_messages IS 'Transactional outbox - guarantees Kafka delivery';
 COMMENT ON COLUMN outbox_messages.status IS 'PENDING=awaiting publish, SENT=published, DEAD_LETTER=max retries exceeded';

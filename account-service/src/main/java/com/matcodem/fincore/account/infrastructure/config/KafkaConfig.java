@@ -16,12 +16,12 @@ import io.confluent.kafka.serializers.AbstractKafkaSchemaSerDeConfig;
 import io.confluent.kafka.serializers.KafkaAvroSerializer;
 
 /**
- * Kafka producer configuration for account-service — Avro edition.
+ * Kafka producer configuration for account-service - Avro edition.
  * <p>
  * Account service is producer-only: emits AccountCreated/Debited/Credited/Frozen events.
  * It does not consume Kafka events (balance updates come in via REST from payment-service).
  * <p>
- * Removed: NewTopic beans — topics are created centrally by kafka-topics-init Job in K8s.
+ * Removed: NewTopic beans - topics are created centrally by kafka-topics-init Job in K8s.
  * Auto-creation in prod is disabled (KAFKA_AUTO_CREATE_TOPICS_ENABLE=false on broker).
  */
 @Configuration

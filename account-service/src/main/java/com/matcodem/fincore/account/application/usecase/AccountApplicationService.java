@@ -24,10 +24,10 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
 /**
- * Application Service — orchestrates domain objects and ports.
+ * Application Service - orchestrates domain objects and ports.
  * <p>
  * Rules:
- * - No business logic here — that belongs to the domain
+ * - No business logic here - that belongs to the domain
  * - Coordinates: load aggregate -> execute domain operation -> persist -> publish events
  * - Transaction boundary lives here
  */
@@ -106,7 +106,7 @@ public class AccountApplicationService implements
 	@Override
 	@Transactional
 	public void freeze(FreezeCommand command) {
-		log.warn("Freezing account: {} — reason: {}", command.accountId(), command.reason());
+		log.warn("Freezing account: {} - reason: {}", command.accountId(), command.reason());
 
 		Account account = loadAccount(command.accountId());
 		account.freeze(command.reason());

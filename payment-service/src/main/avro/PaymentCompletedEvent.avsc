@@ -51,7 +51,7 @@
         "long"
       ],
       "default": null,
-      "doc": "Optional: how long the payment took to process (PENDING → COMPLETED). Useful for SLA monitoring."
+      "doc": "Optional: how long the payment took to process (PENDING -> COMPLETED). Useful for SLA monitoring."
     },
     {
       "name": "schemaVersion",

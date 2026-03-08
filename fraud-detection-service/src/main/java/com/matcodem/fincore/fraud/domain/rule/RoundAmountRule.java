@@ -36,7 +36,7 @@ public class RoundAmountRule implements FraudRule {
 
 		if (isRound && amount.compareTo(BigDecimal.valueOf(1000)) >= 0) {
 			return RuleResult.trigger(getName(), 10,
-					"Suspiciously round amount: %s — commonly seen in structured fraud"
+					"Suspiciously round amount: %s - commonly seen in structured fraud"
 							.formatted(amount));
 		}
 

@@ -19,9 +19,9 @@ import com.matcodem.fincore.fraud.domain.event.FraudConfirmedEvent;
  * Records which rules fired, the composite score, decision, and resolution.
  * <p>
  * Lifecycle:
- * OPEN → APPROVED (auto, low risk)
- * → BLOCKED  (auto, medium/high risk)
- * → UNDER_REVIEW → APPROVED | CONFIRMED_FRAUD
+ * OPEN -> APPROVED (auto, low risk)
+ * -> BLOCKED  (auto, medium/high risk)
+ * -> UNDER_REVIEW -> APPROVED | CONFIRMED_FRAUD
  */
 public class FraudCase {
 

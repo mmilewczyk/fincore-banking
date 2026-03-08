@@ -35,7 +35,7 @@ import lombok.extern.slf4j.Slf4j;
  * processPayment() is intentionally NOT @Transactional at the top level.
  * The distributed lock (Redisson MultiLock) must be acquired BEFORE opening
  * a DB transaction, otherwise the transaction can be held open while waiting
- * for the lock — exhausting the connection pool under contention.
+ * for the lock - exhausting the connection pool under contention.
  * <p>
  * Transaction boundary is inside executeUnderLock(), which opens a new
  *
@@ -48,13 +48,13 @@ import lombok.extern.slf4j.Slf4j;
  * <p>
  * 1. Load payment, verify PENDING (pre-lock optimistic check)
  * 2. Acquire Redisson MultiLock on [sourceAccountId, targetAccountId]
- * — sorted alphabetically to prevent deadlock
+ * - sorted alphabetically to prevent deadlock
  * 3. Re-fetch inside lock + transaction (eliminates race condition window)
- * 4. startProcessing() — status PENDING → PROCESSING
- * 5. [FX_CONVERSION only] FX Service call — synchronous, rate locked
- * 6. Account Service debit — source account
- * 7. Account Service credit — target account
- * 8. complete() — status PROCESSING → COMPLETED
+ * 4. startProcessing() - status PENDING -> PROCESSING
+ * 5. [FX_CONVERSION only] FX Service call - synchronous, rate locked
+ * 6. Account Service debit - source account
+ * 7. Account Service credit - target account
+ * 8. complete() - status PROCESSING -> COMPLETED
  * 9. save() + publish domain events to outbox (same transaction)
  * <p>
  * ── PARTIAL FAILURE / COMPENSATION ───────────────────────────────────────────
@@ -63,9 +63,9 @@ import lombok.extern.slf4j.Slf4j;
  * The payment is marked FAILED. Money is debited but not credited.
  * This is an inconsistency that CANNOT be resolved here automatically
  * (a retry credit might also fail, worsening the state).
- * → CRITICAL log emitted — ops alerted via Prometheus alert rule
- * → Payment stored as FAILED with full reason for audit trail
- * → Compensation job or manual ops intervention required
+ * -> CRITICAL log emitted - ops alerted via Prometheus alert rule
+ * -> Payment stored as FAILED with full reason for audit trail
+ * -> Compensation job or manual ops intervention required
  * In production: PagerDuty + auto JIRA ticket.
  */
 @Slf4j
@@ -86,10 +86,10 @@ public class ProcessPaymentService implements ProcessPaymentUseCase {
 		log.info("Processing payment: {}", paymentId);
 
 		// Pre-lock check: avoids acquiring a lock for an already-terminal payment.
-		// This is an optimistic read — re-checked under lock before any mutation.
+		// This is an optimistic read - re-checked under lock before any mutation.
 		Payment payment = loadPayment(paymentId);
 		if (!payment.isPending()) {
-			log.warn("Payment {} is not PENDING ({}) — skipping", paymentId, payment.getStatus());
+			log.warn("Payment {} is not PENDING ({}) - skipping", paymentId, payment.getStatus());
 			return;
 		}
 
@@ -119,7 +119,7 @@ public class ProcessPaymentService implements ProcessPaymentUseCase {
 			payment.fail(reason);
 			saveAndPublish(payment);
 		} else {
-			log.warn("Payment {} in non-failable state {} — skipping", paymentId, payment.getStatus());
+			log.warn("Payment {} in non-failable state {} - skipping", paymentId, payment.getStatus());
 		}
 	}
 
@@ -130,14 +130,14 @@ public class ProcessPaymentService implements ProcessPaymentUseCase {
 		switch (payment.getStatus()) {
 			case COMPLETED -> reverseCompletedPayment(payment, reason);
 			case PENDING, PROCESSING -> rejectForFraud(paymentId, "Fraud confirmed: " + reason);
-			default -> log.info("Payment {} already terminal ({}) — no action",
+			default -> log.info("Payment {} already terminal ({}) - no action",
 					paymentId, payment.getStatus());
 		}
 	}
 
 	private void reverseCompletedPayment(Payment payment, String reason) {
 		String paymentId = payment.getId().toString();
-		log.error("REVERSAL REQUIRED for payment {} — fraud confirmed: {}", paymentId, reason);
+		log.error("REVERSAL REQUIRED for payment {} - fraud confirmed: {}", paymentId, reason);
 
 		try {
 			// Reverse: debit the recipient, credit the sender
@@ -151,9 +151,9 @@ public class ProcessPaymentService implements ProcessPaymentUseCase {
 			meterRegistry.counter("payment.reversal.completed").increment();
 
 		} catch (Exception ex) {
-			// Reversal failed after fraud confirmed — money cannot be automatically recovered.
-			// This requires human intervention. DO NOT retry here — could worsen state.
-			log.error("CRITICAL: Reversal FAILED for payment {} — MANUAL INTERVENTION REQUIRED. Reason: {}",
+			// Reversal failed after fraud confirmed - money cannot be automatically recovered.
+			// This requires human intervention. DO NOT retry here - could worsen state.
+			log.error("CRITICAL: Reversal FAILED for payment {} - MANUAL INTERVENTION REQUIRED. Reason: {}",
 					paymentId, ex.getMessage());
 			meterRegistry.counter("payment.reversal.failed").increment();
 			// TODO: PagerDuty trigger + auto-create JIRA ticket via webhook
@@ -162,10 +162,10 @@ public class ProcessPaymentService implements ProcessPaymentUseCase {
 
 	/**
 	 * Persist the payment and flush all accumulated domain events to the outbox.
-	 * Called within an active @Transactional context — payment row + outbox rows
+	 * Called within an active @Transactional context - payment row + outbox rows
 	 * are written atomically.
 	 * <p>
-	 * Note: pullDomainEvents() clears the in-memory list — idempotent, safe to call
+	 * Note: pullDomainEvents() clears the in-memory list - idempotent, safe to call
 	 * multiple times (second call returns empty list).
 	 */
 	private void saveAndPublish(Payment payment) {

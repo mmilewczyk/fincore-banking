@@ -28,7 +28,7 @@ import lombok.extern.slf4j.Slf4j;
  * Orchestration flow for each incoming payment event:
  * <p>
  * 1. Enrich payment context (fetch account info, user behavior from cache/DB)
- * 2. Run FraudRuleEngine — evaluates all rules in priority order
+ * 2. Run FraudRuleEngine - evaluates all rules in priority order
  * 3. Create FraudCase aggregate with composite score and decision
  * 4. Persist the FraudCase
  * 5. Publish domain events (FraudCaseApproved / FraudCaseBlocked / FraudCaseEscalated)
@@ -81,7 +81,7 @@ public class FraudDetectionApplicationService implements AnalysePaymentUseCase, 
 				"status", saved.getStatus().name()
 		).increment();
 
-		log.info("Fraud analysis complete — payment: {}, score: {}, status: {}",
+		log.info("Fraud analysis complete - payment: {}, score: {}, status: {}",
 				rawContext.getPaymentId(),
 				evaluation.compositeScore(),
 				saved.getStatus());

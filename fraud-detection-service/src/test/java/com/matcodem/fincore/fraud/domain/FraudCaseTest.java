@@ -30,7 +30,7 @@ class FraudCaseTest {
 	class Evaluation {
 
 		@Test
-		@DisplayName("LOW score → APPROVED status + FraudCaseApprovedEvent")
+		@DisplayName("LOW score -> APPROVED status + FraudCaseApprovedEvent")
 		void lowScoreShouldApprove() {
 			FraudCase fc = FraudCase.evaluate(PAYMENT_ID, SOURCE_ACCOUNT, INITIATED_BY,
 					RiskScore.of(10), List.of(RuleResult.pass("VELOCITY_CHECK")));
@@ -42,7 +42,7 @@ class FraudCaseTest {
 		}
 
 		@Test
-		@DisplayName("MEDIUM score → UNDER_REVIEW status + FraudCaseEscalatedEvent")
+		@DisplayName("MEDIUM score -> UNDER_REVIEW status + FraudCaseEscalatedEvent")
 		void mediumScoreShouldEscalate() {
 			FraudCase fc = FraudCase.evaluate(PAYMENT_ID, SOURCE_ACCOUNT, INITIATED_BY,
 					RiskScore.of(45), List.of());
@@ -53,7 +53,7 @@ class FraudCaseTest {
 		}
 
 		@Test
-		@DisplayName("HIGH score → BLOCKED status + FraudCaseBlockedEvent")
+		@DisplayName("HIGH score -> BLOCKED status + FraudCaseBlockedEvent")
 		void highScoreShouldBlock() {
 			FraudCase fc = FraudCase.evaluate(PAYMENT_ID, SOURCE_ACCOUNT, INITIATED_BY,
 					RiskScore.of(70), List.of(
@@ -67,7 +67,7 @@ class FraudCaseTest {
 		}
 
 		@Test
-		@DisplayName("CRITICAL score → BLOCKED + requiresAccountFreeze")
+		@DisplayName("CRITICAL score -> BLOCKED + requiresAccountFreeze")
 		void criticalScoreShouldRequireFreeze() {
 			FraudCase fc = FraudCase.evaluate(PAYMENT_ID, SOURCE_ACCOUNT, INITIATED_BY,
 					RiskScore.of(90), List.of());
@@ -82,7 +82,7 @@ class FraudCaseTest {
 	class ReviewWorkflow {
 
 		@Test
-		@DisplayName("UNDER_REVIEW → APPROVED after manual review")
+		@DisplayName("UNDER_REVIEW -> APPROVED after manual review")
 		void shouldApproveAfterReview() {
 			FraudCase fc = FraudCase.evaluate(PAYMENT_ID, SOURCE_ACCOUNT, INITIATED_BY,
 					RiskScore.of(40), List.of());
@@ -97,7 +97,7 @@ class FraudCaseTest {
 		}
 
 		@Test
-		@DisplayName("UNDER_REVIEW → CONFIRMED_FRAUD after confirmation")
+		@DisplayName("UNDER_REVIEW -> CONFIRMED_FRAUD after confirmation")
 		void shouldConfirmFraud() {
 			FraudCase fc = FraudCase.evaluate(PAYMENT_ID, SOURCE_ACCOUNT, INITIATED_BY,
 					RiskScore.of(40), List.of());
@@ -114,7 +114,7 @@ class FraudCaseTest {
 		@DisplayName("should reject approveAfterReview when not UNDER_REVIEW")
 		void shouldRejectApprovalWhenNotUnderReview() {
 			FraudCase fc = FraudCase.evaluate(PAYMENT_ID, SOURCE_ACCOUNT, INITIATED_BY,
-					RiskScore.of(10), List.of()); // LOW → APPROVED
+					RiskScore.of(10), List.of()); // LOW -> APPROVED
 
 			assertThatThrownBy(() -> fc.approveAfterReview("officer", "notes"))
 					.isInstanceOf(IllegalStateException.class)

@@ -8,7 +8,7 @@ import jakarta.validation.constraints.NotNull;
 
 /**
  * Request body for debit/credit operations.
- * Called internally by Payment Service — not part of the public API.
+ * Called internally by Payment Service - not part of the public API.
  */
 public record BalanceOperationRequest(
 		@NotNull @DecimalMin("0.01") BigDecimal amount,

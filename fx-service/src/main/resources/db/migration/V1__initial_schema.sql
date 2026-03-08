@@ -1,4 +1,4 @@
--- V1__initial_schema.sql — FX Service
+-- V1__initial_schema.sql - FX Service
 
 CREATE TABLE IF NOT EXISTS exchange_rates
 (
@@ -59,5 +59,5 @@ CREATE INDEX idx_fx_conv_account ON fx_conversions (account_id);
 CREATE INDEX idx_fx_conv_created ON fx_conversions (created_at DESC);
 
 COMMENT ON TABLE exchange_rates IS 'Live exchange rate snapshots with bid/ask spread';
-COMMENT ON TABLE fx_conversions IS 'Immutable record of each FX conversion — financial audit trail';
+COMMENT ON TABLE fx_conversions IS 'Immutable record of each FX conversion - financial audit trail';
 COMMENT ON COLUMN exchange_rates.spread_bps IS '1 bp = 0.01%. Typical: 30-100 bps for retail customers';

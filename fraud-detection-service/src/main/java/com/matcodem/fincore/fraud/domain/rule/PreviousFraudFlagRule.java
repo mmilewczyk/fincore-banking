@@ -29,7 +29,7 @@ public class PreviousFraudFlagRule implements FraudRule {
 
 		if (target != null && target.hasPreviousFraudFlags()) {
 			return RuleResult.trigger(getName(), 35,
-					"Target account %s has prior fraud flags — possible money mule"
+					"Target account %s has prior fraud flags - possible money mule"
 							.formatted(ctx.getTargetAccountId()));
 		}
 
@@ -44,5 +44,5 @@ public class PreviousFraudFlagRule implements FraudRule {
 	@Override
 	public int getOrder() {
 		return 5;
-	} // run early — cheap and high-signal
+	} // run early - cheap and high-signal
 }

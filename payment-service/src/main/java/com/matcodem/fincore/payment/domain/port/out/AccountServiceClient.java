@@ -5,7 +5,7 @@ import com.matcodem.fincore.payment.domain.model.Money;
 import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
 
 /**
- * Driven port — communication with Account Service.
+ * Driven port - communication with Account Service.
  * Implementation uses REST (with circuit breaker) or Kafka commands.
  */
 public interface AccountServiceClient {

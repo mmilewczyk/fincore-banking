@@ -16,7 +16,7 @@ import io.confluent.kafka.serializers.AbstractKafkaSchemaSerDeConfig;
 import io.confluent.kafka.serializers.KafkaAvroSerializer;
 
 /**
- * Kafka producer configuration for FX service — Avro edition.
+ * Kafka producer configuration for FX service - Avro edition.
  * <p>
  * FX service is producer-only (no @KafkaListener).
  * Payment service pushes FX requests via REST (FxServiceWebClient), not Kafka.

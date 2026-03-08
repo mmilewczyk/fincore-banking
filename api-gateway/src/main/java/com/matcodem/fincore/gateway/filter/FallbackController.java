@@ -21,7 +21,7 @@ import lombok.extern.slf4j.Slf4j;
  * - timestamp
  * - traceId (for support to correlate with logs)
  * <p>
- * HTTP 503 Service Unavailable — correct status for circuit-open scenarios.
+ * HTTP 503 Service Unavailable - correct status for circuit-open scenarios.
  * Clients should treat this as temporary and retry with exponential backoff.
  */
 @Slf4j
@@ -53,7 +53,7 @@ public class FallbackController {
 			String serviceName, ServerWebExchange exchange) {
 
 		String traceId = exchange.getRequest().getHeaders().getFirst("X-B3-TraceId");
-		log.warn("Circuit breaker open — fallback triggered for: {} | traceId: {}", serviceName, traceId);
+		log.warn("Circuit breaker open - fallback triggered for: {} | traceId: {}", serviceName, traceId);
 
 		return ResponseEntity
 				.status(HttpStatus.SERVICE_UNAVAILABLE)

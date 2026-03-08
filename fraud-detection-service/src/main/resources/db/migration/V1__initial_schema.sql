@@ -1,4 +1,4 @@
--- V1__initial_schema.sql — Fraud Detection Service
+-- V1__initial_schema.sql - Fraud Detection Service
 
 CREATE TABLE IF NOT EXISTS fraud_cases
 (
@@ -61,4 +61,4 @@ CREATE UNIQUE INDEX ON fraud_daily_stats (day, status, risk_level);
 
 COMMENT ON TABLE fraud_cases IS 'Fraud analysis results per payment';
 COMMENT ON TABLE fraud_rule_results IS 'Individual rule evaluations for each fraud case';
-COMMENT ON MATERIALIZED VIEW fraud_daily_stats IS 'Pre-aggregated analytics — refresh daily';
+COMMENT ON MATERIALIZED VIEW fraud_daily_stats IS 'Pre-aggregated analytics - refresh daily';

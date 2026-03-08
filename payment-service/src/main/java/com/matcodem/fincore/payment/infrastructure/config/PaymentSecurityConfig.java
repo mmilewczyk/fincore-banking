@@ -19,22 +19,22 @@ import org.springframework.security.web.SecurityFilterChain;
 /**
  * Security configuration for payment-service.
  * <p>
- * JWT resource server — all requests must carry a Bearer token issued by Keycloak.
+ * JWT resource server - all requests must carry a Bearer token issued by Keycloak.
  * <p>
  * Role extraction:
- * Keycloak stores roles in JWT under: realm_access.roles → ["ROLE_USER", "ROLE_ADMIN"]
+ * Keycloak stores roles in JWT under: realm_access.roles -> ["ROLE_USER", "ROLE_ADMIN"]
  * Spring Security expects GrantedAuthority with "ROLE_" prefix.
  * The JwtAuthenticationConverter below reads realm_access.roles and maps each
  * to a SimpleGrantedAuthority, making @PreAuthorize("hasRole('USER')") work correctly.
  * <p>
  * Session policy:
- * STATELESS — no HttpSession. Each request is authenticated independently via JWT.
+ * STATELESS - no HttpSession. Each request is authenticated independently via JWT.
  * Required for horizontal scaling (K8s replicas share no session state).
  * <p>
  * Endpoint access:
- * - /actuator/health, /actuator/health/** → public (K8s liveness/readiness probes)
- * - all other /actuator/** → ADMIN only (metrics, env, loggers)
- * - /api/v1/payments/** → authenticated (fine-grained control via @PreAuthorize)
+ * - /actuator/health, /actuator/health/** -> public (K8s liveness/readiness probes)
+ * - all other /actuator/** -> ADMIN only (metrics, env, loggers)
+ * - /api/v1/payments/** -> authenticated (fine-grained control via @PreAuthorize)
  */
 @Configuration
 @EnableWebSecurity
@@ -44,16 +44,16 @@ public class PaymentSecurityConfig {
 	@Bean
 	public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
 		http
-				.csrf(AbstractHttpConfigurer::disable) // stateless API — CSRF not needed
+				.csrf(AbstractHttpConfigurer::disable) // stateless API - CSRF not needed
 				.sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
 				.authorizeHttpRequests(auth -> auth
-						// K8s health probes — must be accessible without token
+						// K8s health probes - must be accessible without token
 						.requestMatchers("/actuator/health", "/actuator/health/**").permitAll()
 						// Prometheus scraping from within the cluster
 						.requestMatchers("/actuator/prometheus").permitAll()
 						// All other actuator endpoints require ADMIN (metrics, env, loggers)
 						.requestMatchers("/actuator/**").hasRole("ADMIN")
-						// All payment endpoints — fine-grained access via @PreAuthorize
+						// All payment endpoints - fine-grained access via @PreAuthorize
 						.requestMatchers("/api/v1/payments/**").authenticated()
 						.anyRequest().denyAll()
 				)
@@ -74,7 +74,7 @@ public class PaymentSecurityConfig {
 	 * }
 	 * <p>
 	 * Maps each role to a Spring GrantedAuthority so @PreAuthorize("hasRole('USER')") works.
-	 * Roles that don't start with "ROLE_" are skipped — Keycloak includes internal roles
+	 * Roles that don't start with "ROLE_" are skipped - Keycloak includes internal roles
 	 * like "offline_access" and "uma_authorization" that are irrelevant to our authorization.
 	 */
 	@Bean

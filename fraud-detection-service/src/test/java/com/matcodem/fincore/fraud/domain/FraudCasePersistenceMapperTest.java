@@ -35,7 +35,7 @@ class FraudCasePersistenceMapperTest {
 		);
 		original.pullDomainEvents(); // clear events
 
-		// domain → entity → domain
+		// domain -> entity -> domain
 		var entity = mapper.toEntity(original);
 		var reconstituted = mapper.toDomain(entity);
 

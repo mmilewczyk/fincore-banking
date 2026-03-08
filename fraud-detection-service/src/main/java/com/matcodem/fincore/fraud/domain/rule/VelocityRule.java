@@ -7,7 +7,7 @@ import com.matcodem.fincore.fraud.domain.model.PaymentContext;
 import com.matcodem.fincore.fraud.domain.model.RuleResult;
 
 /**
- * Rule: Velocity Check — too many transactions in a short window.
+ * Rule: Velocity Check - too many transactions in a short window.
  * <p>
  * A burst of transactions is a classic card-testing or account-takeover signal.
  * <p>
@@ -38,7 +38,7 @@ public class VelocityRule implements FraudRule {
 
 		if (lastHour >= maxPerHourCritical) {
 			return RuleResult.trigger(getName(), 50,
-					"%d transactions in the last hour (limit: %d) — possible card testing attack"
+					"%d transactions in the last hour (limit: %d) - possible card testing attack"
 							.formatted(lastHour, maxPerHourCritical));
 		}
 
