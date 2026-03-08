@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<suppressions xmlns="https://jeremylong.github.io/DependencyCheck/dependency-suppression.1.3.xsd">
+
+	<!--
+		Suppressions for known false positives in the OWASP Dependency Check scan.
+
+		FORMAT:
+		  <suppress>
+			<notes>Why this is suppressed and when to revisit</notes>
+			<packageUrl regex="true">pkg:maven/group/artifact@.*</packageUrl>
+			<cve>CVE-XXXX-XXXXX</cve>
+		  </suppress>
+
+		POLICY:
+		  - Only suppress after confirming the CVE does not apply to this project's usage
+		  - Always include a <notes> block with rationale and review date
+		  - Review suppressions quarterly or on each dependency upgrade
+	-->
+
+	<!--
+		Testcontainers pulls in older Bouncy Castle versions for test scope only.
+		These CVEs affect server-side TLS handshake code not used in test containers.
+		Review when upgrading Testcontainers past 2.0.x.
+	-->
+	<!--
+	<suppress>
+		<notes>Bouncy Castle CVE in test scope only - Testcontainers dependency. Not exploitable in CI test runners. Review on Testcontainers 2.1+.</notes>
+		<packageUrl regex="true">pkg:maven/org\.bouncycastle/.*@.*</packageUrl>
+		<cvssBelow>9</cvssBelow>
+	</suppress>
+	-->
+
+</suppressions>

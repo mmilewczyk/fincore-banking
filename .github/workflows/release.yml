@@ -1,0 +1,156 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'   # v1.0.0, v1.2.3 etc.
+
+env:
+  JAVA_VERSION: '25'
+
+jobs:
+
+  # ─── Verify tag is on main ────────────────────────────────────────────────────
+  verify:
+    name: Verify release tag
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Ensure tag is reachable from main
+        run: |
+          git fetch origin main
+          if ! git merge-base --is-ancestor ${{ github.sha }} origin/main; then
+            echo "ERROR: Release tag must be on main branch"
+            exit 1
+          fi
+
+  # ─── Build & test ─────────────────────────────────────────────────────────────
+  build-and-test:
+    name: Full build & test
+    runs-on: ubuntu-latest
+    needs: verify
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Java ${{ env.JAVA_VERSION }}
+        uses: actions/setup-java@v4
+        with:
+          java-version: ${{ env.JAVA_VERSION }}
+          distribution: temurin
+          cache: maven
+
+      - name: Build & run all tests
+        run: mvn verify -pl account-service,payment-service,fraud-detection-service,fx-service,api-gateway,notification-service -am
+
+  # ─── Docker release images ────────────────────────────────────────────────────
+  docker-release:
+    name: Docker release - ${{ matrix.service }}
+    runs-on: ubuntu-latest
+    needs: build-and-test
+    strategy:
+      matrix:
+        service: [ account-service, payment-service, fraud-detection-service, fx-service, api-gateway, notification-service ]
+
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Java ${{ env.JAVA_VERSION }}
+        uses: actions/setup-java@v4
+        with:
+          java-version: ${{ env.JAVA_VERSION }}
+          distribution: temurin
+          cache: maven
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build JAR
+        run: mvn package -pl ${{ matrix.service }} -am -DskipTests -q
+
+      - name: Extract version from tag
+        id: version
+        run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+
+      - name: Build and push versioned image
+        uses: docker/build-push-action@v5
+        with:
+          context: ${{ matrix.service }}
+          push: true
+          tags: |
+            ghcr.io/${{ github.repository_owner }}/fincore-${{ matrix.service }}:${{ steps.version.outputs.VERSION }}
+            ghcr.io/${{ github.repository_owner }}/fincore-${{ matrix.service }}:latest
+          cache-from: type=registry,ref=ghcr.io/${{ github.repository_owner }}/fincore-${{ matrix.service }}:buildcache
+          cache-to: type=registry,ref=ghcr.io/${{ github.repository_owner }}/fincore-${{ matrix.service }}:buildcache,mode=max
+
+  # ─── GitHub Release ───────────────────────────────────────────────────────────
+  github-release:
+    name: Create GitHub Release
+    runs-on: ubuntu-latest
+    needs: docker-release
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Extract version
+        id: version
+        run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+
+      - name: Generate changelog from commits
+        id: changelog
+        run: |
+          PREV_TAG=$(git tag --sort=-version:refname | grep -v "${{ github.ref_name }}" | head -1)
+          if [ -z "$PREV_TAG" ]; then
+            COMMITS=$(git log --oneline --no-decorate)
+          else
+            COMMITS=$(git log ${PREV_TAG}..${{ github.ref_name }} --oneline --no-decorate)
+          fi
+          echo "CHANGELOG<<EOF" >> $GITHUB_OUTPUT
+          echo "$COMMITS" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: FinCore ${{ steps.version.outputs.VERSION }}
+          body: |
+            ## Docker Images
+
+            All images published to GitHub Container Registry:
+
+            ```bash
+            docker pull ghcr.io/${{ github.repository_owner }}/fincore-account-service:${{ steps.version.outputs.VERSION }}
+            docker pull ghcr.io/${{ github.repository_owner }}/fincore-payment-service:${{ steps.version.outputs.VERSION }}
+            docker pull ghcr.io/${{ github.repository_owner }}/fincore-fraud-detection-service:${{ steps.version.outputs.VERSION }}
+            docker pull ghcr.io/${{ github.repository_owner }}/fincore-fx-service:${{ steps.version.outputs.VERSION }}
+            docker pull ghcr.io/${{ github.repository_owner }}/fincore-api-gateway:${{ steps.version.outputs.VERSION }}
+            docker pull ghcr.io/${{ github.repository_owner }}/fincore-notification-service:${{ steps.version.outputs.VERSION }}
+            ```
+
+            ## Changes
+
+            ${{ steps.changelog.outputs.CHANGELOG }}
+          draft: false
+          prerelease: ${{ contains(github.ref_name, '-rc') || contains(github.ref_name, '-beta') }}

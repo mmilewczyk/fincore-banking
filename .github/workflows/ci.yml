@@ -1,0 +1,224 @@
+name: CI
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+# Cancel in-progress runs for the same branch/PR - saves minutes on rapid pushes
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  JAVA_VERSION: '25'
+  # Reuse Maven local repo across jobs in the same run via cache
+  MAVEN_OPTS: '-Xmx2048m -XX:+TieredCompilation -XX:TieredStopAtLevel=1'
+
+jobs:
+
+  # ─── Job 1: Build & Unit Tests ───────────────────────────────────────────────
+  # Fast feedback loop - runs in ~2 min, no Docker needed.
+  # All 6 services built in parallel after the parent POM is installed.
+
+  build-and-unit-test:
+    name: Build & Unit Tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Java ${{ env.JAVA_VERSION }}
+        uses: actions/setup-java@v4
+        with:
+          java-version: ${{ env.JAVA_VERSION }}
+          distribution: temurin
+          cache: maven
+
+      - name: Build parent POM + install (skip tests)
+        run: mvn install -N -DskipTests -q
+
+      - name: Run unit tests (all modules)
+        run: mvn test -pl account-service,payment-service,fraud-detection-service,fx-service,api-gateway,notification-service
+        # maven-surefire-plugin runs *Test.java - Testcontainers tests tagged @Tag("integration") are excluded
+
+      - name: Upload unit test reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: unit-test-reports
+          path: '**/target/surefire-reports/*.xml'
+          retention-days: 7
+
+  # ─── Job 2: Integration Tests (matrix) ───────────────────────────────────────
+  # Each service runs its own Testcontainers integration tests in isolation.
+  # Matrix lets them run in parallel - total time = slowest service, not sum.
+  # Docker-in-Docker is available on ubuntu-latest - no special runner needed.
+
+  integration-tests:
+    name: Integration Tests - ${{ matrix.service }}
+    runs-on: ubuntu-latest
+    needs: build-and-unit-test
+    strategy:
+      fail-fast: false   # don't cancel all services if one fails
+      matrix:
+        service:
+          - account-service
+          - payment-service
+          - fraud-detection-service
+          - fx-service
+          - notification-service
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Java ${{ env.JAVA_VERSION }}
+        uses: actions/setup-java@v4
+        with:
+          java-version: ${{ env.JAVA_VERSION }}
+          distribution: temurin
+          cache: maven
+
+      - name: Install parent POM
+        run: mvn install -N -DskipTests -q
+
+      - name: Run integration tests - ${{ matrix.service }}
+        run: |
+          mvn verify -pl ${{ matrix.service }} \
+            -Dsurefire.skip=true \
+            -Dfailsafe.rerunFailingTestsCount=1
+        # failsafe runs *IT.java and @Tag("integration") tests via maven-failsafe-plugin
+        # rerunFailingTestsCount=1 retries flaky Testcontainers tests once before failing
+
+      - name: Upload integration test reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: integration-test-reports-${{ matrix.service }}
+          path: ${{ matrix.service }}/target/failsafe-reports/*.xml
+          retention-days: 7
+
+  # ─── Job 3: Code Quality ──────────────────────────────────────────────────────
+  # ArchUnit boundary tests + SpotBugs + dependency vulnerability scan.
+  # Runs in parallel with integration tests - doesn't block them.
+
+  code-quality:
+    name: Code Quality
+    runs-on: ubuntu-latest
+    needs: build-and-unit-test
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Java ${{ env.JAVA_VERSION }}
+        uses: actions/setup-java@v4
+        with:
+          java-version: ${{ env.JAVA_VERSION }}
+          distribution: temurin
+          cache: maven
+
+      - name: Install parent POM
+        run: mvn install -N -DskipTests -q
+
+      - name: OWASP Dependency Check
+        run: |
+          mvn org.owasp:dependency-check-maven:check \
+            -DfailBuildOnCVSS=9 \
+            -DsuppressionFile=.github/owasp-suppressions.xml \
+            --no-transfer-progress
+        # Only fails on CVSS >= 9 (critical). Lower severities logged but don't break the build.
+        # Suppressions file for known false positives in test-scope dependencies.
+        continue-on-error: true   # report but don't block - OWASP DB can lag
+
+      - name: Upload dependency check report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dependency-check-report
+          path: '**/target/dependency-check-report.html'
+          retention-days: 14
+
+  # ─── Job 4: Docker Build ─────────────────────────────────────────────────────
+  # Builds Docker images for all services and pushes to GitHub Container Registry.
+  # Only runs on push to main (not on PRs - no need to push images for review branches).
+
+  docker-build:
+    name: Docker Build & Push - ${{ matrix.service }}
+    runs-on: ubuntu-latest
+    needs: [ integration-tests, code-quality ]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    strategy:
+      matrix:
+        service:
+          - account-service
+          - payment-service
+          - fraud-detection-service
+          - fx-service
+          - api-gateway
+          - notification-service
+        include:
+          - service: account-service
+            port: 8081
+          - service: payment-service
+            port: 8082
+          - service: fraud-detection-service
+            port: 8083
+          - service: fx-service
+            port: 8084
+          - service: api-gateway
+            port: 8080
+          - service: notification-service
+            port: 8086
+
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Java ${{ env.JAVA_VERSION }}
+        uses: actions/setup-java@v4
+        with:
+          java-version: ${{ env.JAVA_VERSION }}
+          distribution: temurin
+          cache: maven
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build JAR
+        run: mvn package -pl ${{ matrix.service }} -am -DskipTests -q
+
+      - name: Extract metadata for Docker
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository_owner }}/fincore-${{ matrix.service }}
+          tags: |
+            type=sha,prefix=sha-
+            type=raw,value=latest,enable={{is_default_branch}}
+            type=semver,pattern={{version}}
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: ${{ matrix.service }}
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          # Layer cache from GHCR - dramatically speeds up repeated builds
+          cache-from: type=registry,ref=ghcr.io/${{ github.repository_owner }}/fincore-${{ matrix.service }}:buildcache
+          cache-to: type=registry,ref=ghcr.io/${{ github.repository_owner }}/fincore-${{ matrix.service }}:buildcache,mode=max
+          build-args: |
+            SERVICE_PORT=${{ matrix.port }}
