@@ -1,0 +1,121 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: notification-service
+  namespace: fincore
+  labels:
+    app: notification-service
+    version: "1.0"
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: notification-service
+  template:
+    metadata:
+      labels:
+        app: notification-service
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/path: "/actuator/prometheus"
+        prometheus.io/port: "8086"
+    spec:
+      containers:
+        - name: notification-service
+          image: fincore/notification-service:latest
+          ports:
+            - containerPort: 8086
+          env:
+            - name: SPRING_DATASOURCE_URL
+              value: jdbc:postgresql://postgres-notification:5432/notification_db
+            - name: SPRING_DATASOURCE_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: notification-db-secret
+                  key: username
+            - name: SPRING_DATASOURCE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: notification-db-secret
+                  key: password
+            - name: SPRING_KAFKA_BOOTSTRAP_SERVERS
+              value: kafka:29092
+            - name: SPRING_KAFKA_PROPERTIES_SCHEMA_REGISTRY_URL
+              value: http://schema-registry:8081
+            # SMTP - use SendGrid in prod via SMTP relay
+            - name: NOTIFICATION_EMAIL_HOST
+              valueFrom:
+                secretKeyRef:
+                  name: notification-email-secret
+                  key: smtp-host
+            - name: NOTIFICATION_EMAIL_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: notification-email-secret
+                  key: smtp-username
+            - name: NOTIFICATION_EMAIL_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: notification-email-secret
+                  key: smtp-password
+            # Twilio SMS
+            - name: NOTIFICATION_SMS_ACCOUNT_SID
+              valueFrom:
+                secretKeyRef:
+                  name: twilio-secret
+                  key: account-sid
+            - name: NOTIFICATION_SMS_AUTH_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: twilio-secret
+                  key: auth-token
+            - name: NOTIFICATION_SMS_FROM_NUMBER
+              valueFrom:
+                secretKeyRef:
+                  name: twilio-secret
+                  key: from-number
+            # Firebase FCM - base64-encoded service account JSON
+            - name: GOOGLE_APPLICATION_CREDENTIALS_BASE64
+              valueFrom:
+                secretKeyRef:
+                  name: firebase-secret
+                  key: credentials-base64
+            - name: SPRING_PROFILES_ACTIVE
+              value: prod
+          livenessProbe:
+            httpGet:
+              path: /actuator/health/liveness
+              port: 8086
+            initialDelaySeconds: 60
+            periodSeconds: 15
+          readinessProbe:
+            httpGet:
+              path: /actuator/health/readiness
+              port: 8086
+            initialDelaySeconds: 30
+            periodSeconds: 10
+          resources:
+            requests:
+              cpu: "200m"
+              memory: "512Mi"
+            limits:
+              cpu: "500m"
+              memory: "768Mi"
+          lifecycle:
+            preStop:
+              exec:
+                command: [ "sh", "-c", "sleep 10" ]
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: notification-service
+  namespace: fincore
+spec:
+  selector:
+    app: notification-service
+  ports:
+    - protocol: TCP
+      port: 8086
+      targetPort: 8086
+  type: ClusterIP
