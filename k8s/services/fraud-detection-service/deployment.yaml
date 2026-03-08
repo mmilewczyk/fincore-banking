@@ -3,6 +3,9 @@ kind: Deployment
 metadata:
   name: fraud-detection-service
   namespace: fincore
+  labels:
+    app: fraud-detection-service
+    version: "1.0"
 spec:
   replicas: 2
   selector:
@@ -14,8 +17,8 @@ spec:
         app: fraud-detection-service
       annotations:
         prometheus.io/scrape: "true"
-        prometheus.io/port: "8083"
         prometheus.io/path: "/actuator/prometheus"
+        prometheus.io/port: "8083"
     spec:
       containers:
         - name: fraud-detection-service
@@ -24,28 +27,56 @@ spec:
             - containerPort: 8083
           env:
             - name: SPRING_DATASOURCE_URL
+              value: jdbc:postgresql://postgres-fraud:5432/fraud_db
+            - name: SPRING_DATASOURCE_USERNAME
               valueFrom:
                 secretKeyRef:
                   name: fraud-db-secret
-                  key: url
+                  key: username
             - name: SPRING_DATASOURCE_PASSWORD
               valueFrom:
                 secretKeyRef:
                   name: fraud-db-secret
                   key: password
             - name: SPRING_KAFKA_BOOTSTRAP_SERVERS
-              value: "kafka.fincore.svc.cluster.local:9092"
-            - name: SERVICES_ACCOUNT_BASE_URL
-              value: "http://account-service.fincore.svc.cluster.local:8081"
-          resources:
-            requests: { memory: "512Mi", cpu: "250m" }
-            limits: { memory: "1Gi",   cpu: "500m" }
+              value: kafka:29092
+            - name: SPRING_KAFKA_PROPERTIES_SCHEMA_REGISTRY_URL
+              value: http://schema-registry:8081
+            - name: SPRING_DATA_REDIS_HOST
+              value: redis
+            - name: SPRING_DATA_REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: redis-secret
+                  key: password
+            - name: SPRING_PROFILES_ACTIVE
+              value: prod
           livenessProbe:
-            httpGet: { path: /actuator/health/liveness, port: 8083 }
+            httpGet:
+              path: /actuator/health/liveness
+              port: 8083
             initialDelaySeconds: 60
+            periodSeconds: 15
+            failureThreshold: 3
           readinessProbe:
-            httpGet: { path: /actuator/health/readiness, port: 8083 }
+            httpGet:
+              path: /actuator/health/readiness
+              port: 8083
             initialDelaySeconds: 30
+            periodSeconds: 10
+            failureThreshold: 3
+          resources:
+            requests:
+              cpu: "250m"
+              memory: "512Mi"
+            limits:
+              cpu: "1000m"
+              memory: "1Gi"
+          lifecycle:
+            preStop:
+              exec:
+                # Allow in-flight Kafka messages to be processed before shutdown
+                command: [ "sh", "-c", "sleep 10" ]
 ---
 apiVersion: v1
 kind: Service
@@ -53,9 +84,10 @@ metadata:
   name: fraud-detection-service
   namespace: fincore
 spec:
-  type: ClusterIP
   selector:
     app: fraud-detection-service
   ports:
-    - port: 8083
+    - protocol: TCP
+      port: 8083
       targetPort: 8083
+  type: ClusterIP
