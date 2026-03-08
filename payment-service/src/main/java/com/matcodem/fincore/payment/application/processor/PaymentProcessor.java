@@ -9,6 +9,7 @@ import org.springframework.transaction.annotation.Transactional;
 import com.matcodem.fincore.payment.adapter.out.client.AccountServiceWebClient;
 import com.matcodem.fincore.payment.adapter.out.client.FxServiceWebClient;
 import com.matcodem.fincore.payment.domain.event.DomainEvent;
+import com.matcodem.fincore.payment.domain.model.Currency;
 import com.matcodem.fincore.payment.domain.model.Money;
 import com.matcodem.fincore.payment.domain.model.Payment;
 import com.matcodem.fincore.payment.domain.model.PaymentId;
@@ -62,8 +63,11 @@ public class PaymentProcessor {
 			accountServiceClient.debitAccount(
 					payment.getSourceAccountId(), payment.getAmount(), paymentId);
 
+			// For FX payments: credit convertedAmount (PLN), not the source-currency amount.
+			// getAmountToCredit() handles this transparently — returns convertedAmount for FX,
+			// original amount for all other payment types.
 			accountServiceClient.creditAccount(
-					payment.getTargetAccountId(), payment.getAmount(), paymentId);
+					payment.getTargetAccountId(), payment.getAmountToCredit(), paymentId);
 
 			payment.complete();
 			saveAndPublish(payment);
@@ -94,9 +98,26 @@ public class PaymentProcessor {
 				.orElseThrow(() -> new NoSuchElementException("Payment not found: " + paymentId));
 	}
 
+	/**
+	 * Calls FX Service to lock an exchange rate and convert the payment amount.
+	 * On success, calls payment.lockFxConversion() to record the result on the aggregate.
+	 * <p>
+	 * CRITICAL: After this method, payment.getAmountToCredit() returns the converted PLN amount.
+	 * creditAccount() MUST be called after this — it reads getAmountToCredit() transparently.
+	 * <p>
+	 * If FX Service is unavailable (circuit breaker open or timeout):
+	 * FxServiceUnavailableException is thrown → caught in executeUnderLock() → payment.fail().
+	 * No money has moved at this point — clean failure, no compensation needed.
+	 * <p>
+	 * Why "BUY_BASE"?
+	 * Customer is selling EUR (source) to buy PLN (target). In FX terminology:
+	 * BUY_BASE = buy the base currency (EUR) from the customer's perspective.
+	 * FX Service uses this to select the correct bid/ask side.
+	 */
 	private void performFxConversion(Payment payment) {
 		String paymentId = payment.getId().toString();
 		Money money = payment.getAmount();
+		// Pair: source currency → PLN (e.g. "EURPLN", "USDPLN")
 		String pair = money.getCurrency().getCode() + "PLN";
 
 		FxServiceWebClient.FxConversionResult fx = fxServiceClient.convert(
@@ -107,9 +128,15 @@ public class PaymentProcessor {
 				money.getAmount(),
 				"BUY_BASE"
 		);
+
 		log.info("FX locked for payment {} — {} {} → {} PLN @ {} (fee: {}, convId: {})",
 				paymentId, money.getAmount(), money.getCurrency().getCode(),
 				fx.convertedAmount(), fx.appliedRate(), fx.fee(), fx.conversionId());
+
+		// Record FX result on the aggregate — this is what creditAccount() will use.
+		// convertedAmount is in PLN (target currency in all FinCore FX flows).
+		Money convertedAmountMoney = Money.of(fx.convertedAmount(), Currency.PLN);
+		payment.lockFxConversion(convertedAmountMoney, fx.conversionId());
 	}
 
 	/**

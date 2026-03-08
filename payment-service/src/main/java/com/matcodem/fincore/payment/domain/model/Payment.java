@@ -39,6 +39,20 @@ public class Payment {
 	private Instant updatedAt;
 	private long version;
 
+	/**
+	 * FX conversion result — populated by lockFxConversion() for FX_CONVERSION payments.
+	 * Null for all other payment types.
+	 * <p>
+	 * convertedAmount: PLN amount credited to target account. Differs from amount (source currency).
+	 * Example: amount=100 EUR, convertedAmount=428.50 PLN.
+	 * creditAccount() in ProcessPaymentService MUST use this for FX payments, not amount.
+	 * <p>
+	 * fxConversionId: ID from FX Service — stored for audit and reversal.
+	 * Compliance uses this to unwind the FX leg on fraud-confirmed reversals.
+	 */
+	private Money convertedAmount;   // null for non-FX payments
+	private String fxConversionId;   // null for non-FX payments
+
 	private final List<DomainEvent> domainEvents = new ArrayList<>();
 
 	private Payment(PaymentId id, IdempotencyKey idempotencyKey,
@@ -106,7 +120,8 @@ public class Payment {
 			String sourceAccountId, String targetAccountId,
 			Money amount, PaymentType type, String initiatedBy,
 			PaymentStatus status, String failureReason,
-			Instant createdAt, Instant updatedAt, long version) {
+			Instant createdAt, Instant updatedAt, long version,
+			Money convertedAmount, String fxConversionId) {
 
 		Payment payment = new Payment(
 				id, idempotencyKey, sourceAccountId, targetAccountId,
@@ -114,6 +129,8 @@ public class Payment {
 		);
 		payment.failureReason = failureReason;
 		payment.updatedAt = updatedAt;
+		payment.convertedAmount = convertedAmount;
+		payment.fxConversionId = fxConversionId;
 		return payment;
 	}
 
@@ -127,6 +144,39 @@ public class Payment {
 			);
 		}
 		this.status = PaymentStatus.PROCESSING;
+		this.updatedAt = Instant.now();
+	}
+
+	/**
+	 * Records the result of a successful FX conversion.
+	 * Called by ProcessPaymentService after FX Service confirms the rate and locked amount.
+	 * <p>
+	 * This method MUST be called before creditAccount() on FX_CONVERSION payments.
+	 * ProcessPaymentService uses getConvertedAmount() to determine how much PLN to credit.
+	 * <p>
+	 * Invariants:
+	 * - Only valid for FX_CONVERSION type
+	 * - Only callable in PROCESSING status (after startProcessing())
+	 * - convertedAmount currency must be PLN (target currency in FinCore FX flows)
+	 * - conversionId must not be blank
+	 */
+	public void lockFxConversion(Money convertedAmount, String conversionId) {
+		if (type != PaymentType.FX_CONVERSION) {
+			throw new IllegalStateException(
+					"lockFxConversion() called on non-FX payment type: %s (id: %s)".formatted(type, id));
+		}
+		if (status != PaymentStatus.PROCESSING) {
+			throw new IllegalStateException(
+					"lockFxConversion() requires PROCESSING status, got: %s (id: %s)".formatted(status, id));
+		}
+		if (convertedAmount == null || !convertedAmount.isPositive()) {
+			throw new IllegalArgumentException("Converted amount must be positive, got: " + convertedAmount);
+		}
+		if (conversionId == null || conversionId.isBlank()) {
+			throw new IllegalArgumentException("FX conversionId must not be blank");
+		}
+		this.convertedAmount = convertedAmount;
+		this.fxConversionId = conversionId;
 		this.updatedAt = Instant.now();
 	}
 
@@ -228,6 +278,27 @@ public class Payment {
 
 	public PaymentId getId() {
 		return id;
+	}
+
+	public Money getConvertedAmount() {
+		return convertedAmount;
+	}
+
+	public String getFxConversionId() {
+		return fxConversionId;
+	}
+
+	public boolean isFxPayment() {
+		return type == PaymentType.FX_CONVERSION;
+	}
+
+	/**
+	 * Returns the amount to credit to the target account.
+	 * For FX payments: convertedAmount (PLN). For all others: original amount.
+	 * ProcessPaymentService uses this — never hardcodes which amount to credit.
+	 */
+	public Money getAmountToCredit() {
+		return (isFxPayment() && convertedAmount != null) ? convertedAmount : amount;
 	}
 
 	public IdempotencyKey getIdempotencyKey() {

@@ -66,4 +66,20 @@ public class PaymentJpaEntity {
 	@Version
 	@Column(name = "version", nullable = false)
 	private long version;
+
+	/**
+	 * FX conversion result — populated after FX Service confirms the locked rate.
+	 * Null for non-FX payments (INTERNAL_TRANSFER, EXTERNAL_TRANSFER, BILL_PAYMENT).
+	 * <p>
+	 * converted_amount: PLN amount credited to target account (not the source-currency amount).
+	 * fx_conversion_id: UUID from FX Service — for audit trail and dispute resolution.
+	 */
+	@Column(name = "converted_amount", precision = 19, scale = 4)
+	private BigDecimal convertedAmount;
+
+	@Column(name = "converted_currency", length = 3)
+	private String convertedCurrency;
+
+	@Column(name = "fx_conversion_id", length = 36)
+	private String fxConversionId;
 }

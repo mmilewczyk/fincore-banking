@@ -6,10 +6,16 @@ import java.util.NoSuchElementException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.matcodem.fincore.payment.adapter.out.client.AccountServiceWebClient.AccountServiceUnavailableException;
+import com.matcodem.fincore.payment.adapter.out.client.FxServiceWebClient;
+import com.matcodem.fincore.payment.adapter.out.client.FxServiceWebClient.FxServiceUnavailableException;
 import com.matcodem.fincore.payment.application.processor.PaymentProcessor;
 import com.matcodem.fincore.payment.domain.event.DomainEvent;
+import com.matcodem.fincore.payment.domain.model.Currency;
+import com.matcodem.fincore.payment.domain.model.Money;
 import com.matcodem.fincore.payment.domain.model.Payment;
 import com.matcodem.fincore.payment.domain.model.PaymentId;
+import com.matcodem.fincore.payment.domain.model.PaymentType;
 import com.matcodem.fincore.payment.domain.port.in.ProcessPaymentUseCase;
 import com.matcodem.fincore.payment.domain.port.out.AccountServiceClient;
 import com.matcodem.fincore.payment.domain.port.out.OutboxEventPublisher;

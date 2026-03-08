@@ -11,19 +11,6 @@ import com.matcodem.fincore.payment.domain.model.PaymentStatus;
 import com.matcodem.fincore.payment.domain.model.PaymentType;
 import com.matcodem.fincore.payment.infrastructure.persistence.entity.PaymentJpaEntity;
 
-/**
- * Mapper between Payment aggregate and PaymentJpaEntity.
- * <p>
- * Extracted from PaymentRepositoryAdapter to follow Single Responsibility —
- * the adapter's job is orchestration (find/save/cache), the mapper's job is
- * object graph translation.
- * <p>
- * Why not use MapStruct here?
- * Payment is a DDD aggregate with private constructors and factory methods.
- * MapStruct requires setters or all-args constructors. Using Payment.reconstitute()
- * explicitly is intentional — it communicates that we're restoring state from
- * persistence, not creating a new domain object.
- */
 @Component
 public class PaymentMapper {
 
@@ -42,6 +29,12 @@ public class PaymentMapper {
 		e.setCreatedAt(p.getCreatedAt());
 		e.setUpdatedAt(p.getUpdatedAt());
 		e.setVersion(p.getVersion());
+		// FX fields - null for non-FX payments
+		if (p.getConvertedAmount() != null) {
+			e.setConvertedAmount(p.getConvertedAmount().getAmount());
+			e.setConvertedCurrency(p.getConvertedAmount().getCurrency().getCode());
+		}
+		e.setFxConversionId(p.getFxConversionId());
 		return e;
 	}
 
@@ -58,7 +51,12 @@ public class PaymentMapper {
 				e.getFailureReason(),
 				e.getCreatedAt(),
 				e.getUpdatedAt(),
-				e.getVersion()
+				e.getVersion(),
+				// Reconstitute FX result - null for non-FX payments
+				e.getConvertedAmount() != null
+						? Money.of(e.getConvertedAmount(), Currency.fromCode(e.getConvertedCurrency()))
+						: null,
+				e.getFxConversionId()
 		);
 	}
 }
