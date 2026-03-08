@@ -11,9 +11,9 @@
 		<relativePath>../pom.xml</relativePath>
 	</parent>
 
-	<artifactId>fraud-detection-service</artifactId>
+	<artifactId>fx-service</artifactId>
 	<version>1.0.0-SNAPSHOT</version>
-	<description>FinCore Fraud Detection Service - Strategy Pattern rule engine, FraudCase aggregate</description>
+	<description>FinCore FX Service</description>
 
 	<properties>
 		<bucket4j.version>8.14.0</bucket4j.version>
@@ -24,6 +24,14 @@
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-webmvc</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-security</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-oauth2-resource-server</artifactId>
 		</dependency>
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
@@ -40,6 +48,10 @@
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-actuator</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-webflux</artifactId>
 		</dependency>
 
 		<!-- Kafka -->
@@ -70,6 +82,15 @@
 			<version>${bucket4j.version}</version>
 			<type>pom</type>
 			<scope>compile</scope>
+		</dependency>
+
+		<dependency>
+			<groupId>io.github.resilience4j</groupId>
+			<artifactId>resilience4j-spring-boot3</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>io.github.resilience4j</groupId>
+			<artifactId>resilience4j-reactor</artifactId>
 		</dependency>
 
 		<!-- Database -->
@@ -158,9 +179,9 @@
 							<outputDirectory>${project.build.directory}/generated-sources/avro</outputDirectory>
 						</configuration>
 					</execution>
-					<!-- Outbound: fraud decision events published by this service -->
+					<!-- Outbound: fx events published by this service -->
 					<execution>
-						<id>generate-fraud-avro</id>
+						<id>generate-fx-avro</id>
 						<phase>generate-sources</phase>
 						<goals><goal>schema</goal></goals>
 						<configuration>

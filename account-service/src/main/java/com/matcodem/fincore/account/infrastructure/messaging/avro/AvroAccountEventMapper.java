@@ -31,6 +31,8 @@ public class AvroAccountEventMapper {
 				.setOwnerId(e.ownerId())
 				.setIban(e.iban().getValue())
 				.setCurrency(com.matcodem.fincore.account.avro.AccountCurrency.valueOf(e.currency().getCode()))
+				.setEmail(e.email())
+				.setPhoneNumber(e.phoneNumber())
 				.setSchemaVersion(1)
 				.build();
 	}

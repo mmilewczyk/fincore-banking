@@ -57,7 +57,8 @@ public class AccountApplicationService implements
 			iban = ibanGenerator.generate();
 		}
 
-		Account account = Account.open(command.ownerId(), iban, command.currency());
+		Account account = Account.open(command.ownerId(), iban, command.currency(),
+				command.email(), command.phoneNumber());
 		Account saved = accountRepository.save(account);
 
 		publishAndAudit(saved, "system");

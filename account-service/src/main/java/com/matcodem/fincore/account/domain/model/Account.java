@@ -52,10 +52,12 @@ public class Account {
 	/**
 	 * Factory method - creates a new account and records domain event.
 	 */
-	public static Account open(String ownerId, IBAN iban, Currency currency) {
+	public static Account open(String ownerId, IBAN iban, Currency currency,
+	                           String email, String phoneNumber) {
 		Objects.requireNonNull(ownerId, "OwnerId cannot be null");
 		Objects.requireNonNull(iban, "IBAN cannot be null");
 		Objects.requireNonNull(currency, "Currency cannot be null");
+		Objects.requireNonNull(email, "Email cannot be null");
 
 		AccountId id = AccountId.generate();
 		Instant now = Instant.now();
@@ -64,7 +66,7 @@ public class Account {
 		Account account = new Account(id, ownerId, iban, currency, initialBalance,
 				AccountStatus.ACTIVE, now, 0L);
 
-		account.recordEvent(new AccountCreatedEvent(id, ownerId, iban, currency, now));
+		account.recordEvent(new AccountCreatedEvent(id, ownerId, iban, currency, email, phoneNumber, now));
 		return account;
 	}
 

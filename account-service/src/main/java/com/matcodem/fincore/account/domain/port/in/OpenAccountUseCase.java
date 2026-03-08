@@ -9,11 +9,14 @@ public interface OpenAccountUseCase {
 
 	record OpenAccountCommand(
 			String ownerId,
-			Currency currency
+			Currency currency,
+			String email,
+			String phoneNumber   // nullable
 	) {
 		public OpenAccountCommand {
 			if (ownerId == null || ownerId.isBlank()) throw new IllegalArgumentException("OwnerId required");
 			if (currency == null) throw new IllegalArgumentException("Currency required");
+			if (email == null || email.isBlank()) throw new IllegalArgumentException("Email required");
 		}
 	}
 }

@@ -6,6 +6,7 @@ import java.util.concurrent.TimeUnit;
 import org.redisson.Redisson;
 import org.redisson.api.RedissonClient;
 import org.redisson.config.Config;
+import org.redisson.config.SingleServerConfig;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -52,12 +53,15 @@ public class InfrastructureConfig {
 	@Bean(destroyMethod = "shutdown")
 	public RedissonClient redissonClient() {
 		Config config = new Config();
+		// set watchdog timeout globally
+		config.setLockWatchdogTimeout(30_000L);
+
 		config.useSingleServer()
 				.setAddress("redis://%s:%d".formatted(redisHost, redisPort))
 				.setPassword(redisPassword)
 				.setConnectionMinimumIdleSize(2)
-				.setConnectionPoolSize(10)
-				.setLockWatchdogTimeout(30_000);
+				.setConnectionPoolSize(10);
+
 		return Redisson.create(config);
 	}
 

@@ -41,7 +41,7 @@ import lombok.extern.slf4j.Slf4j;
 public class PaymentEventKafkaConsumer {
 
 	private final SendNotificationUseCase sendNotificationUseCase;
-	private final UserContactResolver userContactResolver;
+	private final UserContactResolver persistentUserContactResolver;
 	private final NotificationPayloadFactory payloadFactory;
 	private final MeterRegistry meterRegistry;
 
@@ -56,7 +56,7 @@ public class PaymentEventKafkaConsumer {
 		log.info("PaymentCompleted received: paymentId={}", event.getPaymentId());
 
 		try {
-			RecipientContact contact = userContactResolver.resolve(event.getInitiatedBy());
+			RecipientContact contact = persistentUserContactResolver.resolve(event.getSourceAccountId());
 			var payload = payloadFactory.forPaymentCompleted(
 					event.getPaymentId(),
 					event.getAmount(),
@@ -87,12 +87,12 @@ public class PaymentEventKafkaConsumer {
 		log.info("PaymentFailed received: paymentId={}", event.getPaymentId());
 
 		try {
-			RecipientContact contact = userContactResolver.resolve(event.getInitiatedBy());
+			RecipientContact contact = persistentUserContactResolver.resolve(event.getSourceAccountId());
 			var payload = payloadFactory.forPaymentFailed(
 					event.getPaymentId(),
 					event.getAmount(),
 					event.getCurrency().name(),
-					event.getReason()
+					event.getFailureReason()
 			);
 			sendNotificationUseCase.createNotifications(
 					event.getEventId(), contact, NotificationType.PAYMENT_FAILED, payload);
@@ -118,7 +118,7 @@ public class PaymentEventKafkaConsumer {
 		log.warn("PaymentFraudRejected received: paymentId={}", event.getPaymentId());
 
 		try {
-			RecipientContact contact = userContactResolver.resolve(event.getInitiatedBy());
+			RecipientContact contact = persistentUserContactResolver.resolve(event.getSourceAccountId());
 			var payload = payloadFactory.forPaymentFraudRejected(
 					event.getPaymentId(),
 					event.getAmount(),

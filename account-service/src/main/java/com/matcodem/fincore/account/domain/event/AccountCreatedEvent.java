@@ -13,12 +13,15 @@ public record AccountCreatedEvent(
 		AccountId accountId,
 		String ownerId,
 		IBAN iban,
-		Currency currency
+		Currency currency,
+		String email,
+		String phoneNumber   // nullable
 ) implements DomainEvent {
 
 	public AccountCreatedEvent(AccountId accountId, String ownerId, IBAN iban,
-	                           Currency currency, Instant occurredAt) {
-		this(UUID.randomUUID(), occurredAt, accountId, ownerId, iban, currency);
+	                           Currency currency, String email, String phoneNumber,
+	                           Instant occurredAt) {
+		this(UUID.randomUUID(), occurredAt, accountId, ownerId, iban, currency, email, phoneNumber);
 	}
 
 	@Override

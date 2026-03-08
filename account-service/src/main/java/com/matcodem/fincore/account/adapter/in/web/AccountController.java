@@ -56,7 +56,7 @@ public class AccountController {
 			@AuthenticationPrincipal Jwt jwt) {
 
 		String ownerId = jwt.getSubject();
-		var command = new OpenAccountUseCase.OpenAccountCommand(ownerId, request.currency());
+		var command = new OpenAccountUseCase.OpenAccountCommand(ownerId, request.currency(), request.email(), request.phoneNumber());
 		var account = openAccountUseCase.openAccount(command);
 		var response = mapper.toResponse(account);
 

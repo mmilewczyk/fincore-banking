@@ -39,7 +39,7 @@ import lombok.extern.slf4j.Slf4j;
 public class AccountEventKafkaConsumer {
 
 	private final SendNotificationUseCase sendNotificationUseCase;
-	private final UserContactResolver userContactResolver;
+	private final UserContactResolver persistentUserContactResolver;
 	private final NotificationPayloadFactory payloadFactory;
 	private final MeterRegistry meterRegistry;
 
@@ -55,7 +55,7 @@ public class AccountEventKafkaConsumer {
 
 		try {
 			// Resolve user from account - UserContactResolver handles account->user lookup
-			RecipientContact contact = userContactResolver.resolveByAccountId(event.getAccountId());
+			RecipientContact contact = persistentUserContactResolver.resolveByAccountId(event.getAccountId());
 			var payload = payloadFactory.forAccountDebited(
 					event.getAccountId(),
 					event.getAmount(),
@@ -85,7 +85,7 @@ public class AccountEventKafkaConsumer {
 		AccountCreditedEvent event = (AccountCreditedEvent) record.value();
 
 		try {
-			RecipientContact contact = userContactResolver.resolveByAccountId(event.getAccountId());
+			RecipientContact contact = persistentUserContactResolver.resolveByAccountId(event.getAccountId());
 			var payload = payloadFactory.forAccountCredited(
 					event.getAccountId(),
 					event.getAmount(),
@@ -116,7 +116,7 @@ public class AccountEventKafkaConsumer {
 		log.warn("AccountFrozen received: accountId={}, reason={}", event.getAccountId(), event.getReason());
 
 		try {
-			RecipientContact contact = userContactResolver.resolveByAccountId(event.getAccountId());
+			RecipientContact contact = persistentUserContactResolver.resolveByAccountId(event.getAccountId());
 			var payload = payloadFactory.forAccountFrozen(event.getAccountId(), event.getReason());
 			sendNotificationUseCase.createNotifications(
 					event.getEventId(), contact, NotificationType.ACCOUNT_FROZEN, payload);
