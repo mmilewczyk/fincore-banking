@@ -18,12 +18,12 @@ import com.matcodem.fincore.fx.adapter.in.web.dto.ConversionQuoteResponse;
 import com.matcodem.fincore.fx.adapter.in.web.dto.ConvertRequest;
 import com.matcodem.fincore.fx.adapter.in.web.dto.ExchangeRateResponse;
 import com.matcodem.fincore.fx.adapter.in.web.dto.FxConversionResponse;
-import com.matcodem.fincore.fx.application.usecase.FxApplicationService;
+import com.matcodem.fincore.fx.application.usecase.FxConversionService;
+import com.matcodem.fincore.fx.application.usecase.FxRateQueryService;
 import com.matcodem.fincore.fx.domain.model.CurrencyPair;
 import com.matcodem.fincore.fx.domain.model.ExchangeRate;
 import com.matcodem.fincore.fx.domain.model.FxConversion;
 import com.matcodem.fincore.fx.domain.port.in.ConvertCurrencyUseCase;
-import com.matcodem.fincore.fx.domain.port.out.ExchangeRateRepository;
 
 import io.micrometer.core.annotation.Timed;
 import jakarta.validation.Valid;
@@ -34,8 +34,8 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public class FxController {
 
-	private final FxApplicationService fxService;
-	private final ExchangeRateRepository rateRepository;
+	private final FxConversionService fxConversionService;
+	private final FxRateQueryService fxRateQueryService;
 
 	/**
 	 * Get current exchange rate for a pair
@@ -44,7 +44,7 @@ public class FxController {
 	@Timed(value = "api.fx.rate")
 	@PreAuthorize("hasRole('ROLE_USER')")
 	public ResponseEntity<ExchangeRateResponse> getRate(@PathVariable String pair) {
-		ExchangeRate rate = fxService.getRateWithFallback(CurrencyPair.fromSymbol(pair));
+		ExchangeRate rate = fxRateQueryService.getRateWithFallback(CurrencyPair.fromSymbol(pair));
 		return ResponseEntity.ok(toRateResponse(rate));
 	}
 
@@ -55,7 +55,7 @@ public class FxController {
 	@PreAuthorize("hasRole('ROLE_USER')")
 	public ResponseEntity<List<ExchangeRateResponse>> getAllRates() {
 		return ResponseEntity.ok(
-				rateRepository.findAllActive().stream()
+				fxRateQueryService.getAllActiveRates().stream()
 						.map(this::toRateResponse).toList()
 		);
 	}
@@ -69,7 +69,7 @@ public class FxController {
 	public ResponseEntity<ConversionQuoteResponse> quote(
 			@Valid @RequestBody ConversionQuoteRequest request) {
 
-		var result = fxService.quote(
+		var result = fxConversionService.quote(
 				CurrencyPair.fromSymbol(request.pair()),
 				request.amount(),
 				ExchangeRate.ConversionDirection.valueOf(request.direction())
@@ -87,7 +87,7 @@ public class FxController {
 			@Valid @RequestBody ConvertRequest request,
 			@AuthenticationPrincipal Jwt jwt) {
 
-		FxConversion conversion = fxService.convert(new ConvertCurrencyUseCase.ConvertCommand(
+		FxConversion conversion = fxConversionService.convert(new ConvertCurrencyUseCase.ConvertCommand(
 				request.paymentId(),
 				request.accountId(),
 				jwt.getSubject(),

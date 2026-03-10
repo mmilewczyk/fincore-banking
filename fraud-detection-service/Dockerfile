@@ -40,7 +40,7 @@ USER fincore
 
 WORKDIR /app
 
-# Copy extracted layers in order of change frequency (least → most)
+# Copy extracted layers in order of change frequency (least -> most)
 # Docker caches each COPY as a separate layer - only the changed layers are pushed
 COPY --from=builder /build/layers/dependencies/          ./
 COPY --from=builder /build/layers/spring-boot-loader/    ./

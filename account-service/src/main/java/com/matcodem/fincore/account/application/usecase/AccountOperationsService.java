@@ -76,7 +76,7 @@ public class AccountOperationsService implements UpdateAccountBalanceUseCase, Fr
 	 * Unified execution template for all account mutation operations.
 	 *
 	 * @param accountId   the target account
-	 * @param operation   domain operation to apply — defined in Account aggregate,
+	 * @param operation   domain operation to apply - defined in Account aggregate,
 	 *                    throws domain exceptions on invariant violations
 	 * @param performedBy audit attribution (userId from JWT, or "system" for internal ops)
 	 */

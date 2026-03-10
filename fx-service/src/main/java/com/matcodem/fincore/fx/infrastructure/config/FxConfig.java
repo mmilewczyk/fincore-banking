@@ -37,10 +37,11 @@ public class FxConfig {
 	public RateRefreshService rateRefreshService(
 			List<RateProviderClient> providers,
 			ExchangeRateRepository rateRepository,
-			FxEventPublisher eventPublisher) {
+			FxEventPublisher eventPublisher,
+			MeterRegistry meterRegistry) {
 		return new RateRefreshService(
 				providers, rateRepository, eventPublisher,
-				defaultSpreadBps, Duration.ofMinutes(rateValidityMinutes)
+				defaultSpreadBps, Duration.ofMinutes(rateValidityMinutes), meterRegistry
 		);
 	}
 

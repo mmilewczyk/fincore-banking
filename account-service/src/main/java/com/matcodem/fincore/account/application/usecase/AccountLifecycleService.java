@@ -49,7 +49,7 @@ public class AccountLifecycleService implements OpenAccountUseCase {
 		IBAN iban = ibanGenerator.generate();
 		// Defensive retry - collision probability is negligible but we guard it explicitly
 		if (accountRepository.existsByIban(iban)) {
-			log.warn("IBAN collision detected — regenerating");
+			log.warn("IBAN collision detected - regenerating");
 			iban = ibanGenerator.generate();
 		}
 		return iban;
