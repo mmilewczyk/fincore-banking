@@ -51,4 +51,9 @@ public class AccountRepositoryAdapter implements AccountRepository {
 	public boolean existsByIban(IBAN iban) {
 		return accountJpaRepository.existsByIban(iban.getValue());
 	}
+
+	@Override
+	public boolean existsById(AccountId accountId) {
+		return accountJpaRepository.existsById(accountId.value());
+	}
 }

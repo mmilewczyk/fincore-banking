@@ -18,4 +18,6 @@ public interface AccountRepository {
 	List<Account> findByOwnerId(String ownerId);
 
 	boolean existsByIban(IBAN iban);
+
+	boolean existsById(AccountId accountId);
 }
